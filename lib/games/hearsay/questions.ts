@@ -35,6 +35,36 @@ export const QUESTION_BANK: Question[] = [
   { id: 's4', family: 'secrets', tone: 'mild', template: 'Who does {X} tell things to before anyone else?' },
   { id: 's5', family: 'secrets', tone: 'spicy', template: 'Who has {X} definitely talked about behind their back?' },
   { id: 's6', family: 'secrets', tone: 'spicy', template: 'Who would be least surprised by {X} at their worst?' },
+  // Generated with scripts/generate-questions.mjs and hand vetted. Anything that
+  // restated an existing question was dropped: two questions with the same
+  // meaning make an impossible decoy pair, because the tally cannot separate them.
+  { id: 'cf200', family: 'conflict', tone: 'mild', template: 'If {X} started a petty feud, who would it be with?' },
+  { id: 'cf201', family: 'conflict', tone: 'mild', template: 'Which person can annoy {X} in under ten seconds?' },
+  { id: 'cf202', family: 'conflict', tone: 'mild', template: 'Who is most likely to steal the last slice from {X}?' },
+  { id: 'cf203', family: 'conflict', tone: 'mild', template: 'Which person does {X} secretly compete with?' },
+  { id: 'cf204', family: 'conflict', tone: 'mild', template: '{X} and who else always pick different sides in an argument?' },
+
+  { id: 'af200', family: 'affection', tone: 'mild', template: 'Who does {X} light up around the most?' },
+  { id: 'af201', family: 'affection', tone: 'mild', template: 'Who would {X} choose to sit next to on a long flight?' },
+  { id: 'af202', family: 'affection', tone: 'mild', template: '{X} gets a puppy. Who does it love more?' },
+  { id: 'af203', family: 'affection', tone: 'mild', template: 'Who does {X} always end up talking to at parties?' },
+  { id: 'af204', family: 'affection', tone: 'mild', template: 'Who gives {X} the best hugs in this room?' },
+
+  { id: 'ch200', family: 'chaos', tone: 'mild', template: 'Who would {X} follow into a terrible plan without asking questions?' },
+  { id: 'ch201', family: 'chaos', tone: 'mild', template: 'If {X} started a fire, who would be the one who lit it?' },
+  { id: 'ch202', family: 'chaos', tone: 'mild', template: "Who is {X}'s partner in crime for bad ideas?" },
+  { id: 'ch203', family: 'chaos', tone: 'mild', template: "If {X}'s life were a disaster movie, who plays the villain?" },
+  { id: 'ch204', family: 'chaos', tone: 'mild', template: 'Who would {X} blame first when the plan falls apart?' },
+
+  { id: 'tr200', family: 'trust', tone: 'mild', template: 'If {X} said trust me, who would actually believe it?' },
+  { id: 'tr201', family: 'trust', tone: 'mild', template: 'Whose secret is safest with {X}?' },
+  { id: 'tr202', family: 'trust', tone: 'mild', template: 'If the plan fell apart, who would {X} save first?' },
+  { id: 'tr203', family: 'trust', tone: 'mild', template: 'If {X} vanished for a week, who would notice first?' },
+
+  { id: 'se200', family: 'secrets', tone: 'mild', template: '{X} is bursting with a secret. Who cracks it out of them?' },
+  { id: 'se201', family: 'secrets', tone: 'mild', template: "If there's a secret in the group, who tells {X} last?" },
+  { id: 'se202', family: 'secrets', tone: 'mild', template: 'Who would {X} never trust with a secret?' },
+  { id: 'se203', family: 'secrets', tone: 'mild', template: 'Whose secret is {X} most likely still keeping right now?' },
 ]
 
 // Mild counts per family: conflict 3, affection 3, chaos 3, trust 4, secrets 4.
