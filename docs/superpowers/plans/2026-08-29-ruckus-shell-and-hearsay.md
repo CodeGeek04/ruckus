@@ -2457,7 +2457,9 @@ export function HearsayPlayerScreen({
   view: HearsayPlayerView
   send: (input: HearsayInput) => void
 }) {
-  if (view.isAccused && view.action === 'wait' && view.phase !== 'verdict' && view.phase !== 'scoreboard') {
+  // Phase-based, not action-based: the accused also has action 'wait' during
+  // evidence (when they must study the tally) and after the game ends.
+  if (view.isAccused && (view.phase === 'charge' || view.phase === 'testimony')) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-6 p-8 text-center">
         <p className="text-5xl font-black uppercase text-white">Look away</p>
