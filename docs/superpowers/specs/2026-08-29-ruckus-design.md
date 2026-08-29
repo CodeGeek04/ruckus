@@ -38,8 +38,8 @@ Serverless WebSocket pub/sub, used purely as a message bus. No database, no tabl
 
 Two channels per room:
 
-- `/room/{code}` — host broadcasts public state; players publish their inputs.
-- `/room/{code}/p/{playerId}` — host sends per-player secrets. This channel exists because the players are the kind of people who would open devtools. Hearsay's charge and Ghostwriter's role assignment travel here and must never appear in public state.
+- `/room/{code}`: host broadcasts public state; players publish their inputs.
+- `/room/{code}/p/{playerId}`: host sends per-player secrets. This channel exists because the players are the kind of people who would open devtools. Hearsay's charge and Ghostwriter's role assignment travel here and must never appear in public state.
 
 Auth: API key for browser clients, IAM for server routes. Connection presence drives the lobby's connected/dropped indicators.
 
