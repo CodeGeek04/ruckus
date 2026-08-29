@@ -12,6 +12,16 @@ export type ToRoom =
   | { t: 'lobby'; players: Player[]; code: string }
   | { t: 'host'; gameId: string; view: unknown; deadline: number | null }
   | { t: 'ended' }
+  /** Heartbeat. Phones use its absence to detect that the host tab is gone. */
+  | { t: 'ping' }
+  /** Sent on a clean host teardown, so phones do not wait for the timeout. */
+  | { t: 'gone' }
+
+/** How often the host announces it is still alive, and how long a phone waits
+ * before declaring it gone. The gap is generous because a publish round trip
+ * over a phone network can stall for a few seconds without anything being wrong. */
+export const HEARTBEAT_MS = 3000
+export const HOST_TIMEOUT_MS = 11000
 
 /** Host to one phone, on that phone's private channel. */
 export type ToPlayer =

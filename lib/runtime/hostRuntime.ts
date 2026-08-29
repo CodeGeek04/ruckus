@@ -4,7 +4,7 @@
 import { createBus, type Bus } from '@/lib/bus/client'
 import { privateChannel, publicChannel } from '@/lib/bus/channels'
 import { PLAYER_COLORS, type GameModule, type Player, type PlayerId } from '@/lib/types'
-import type { ToHost, ToPlayer, ToRoom } from './protocol'
+import { HEARTBEAT_MS, type ToHost, type ToPlayer, type ToRoom } from './protocol'
 
 type AnyGame = GameModule<unknown, unknown, unknown, unknown>
 
@@ -58,6 +58,12 @@ export function createHostRuntime(code: string, cb: HostCallbacks): HostRuntime 
   let state: unknown = null
   let deadline: number | null = null
   let timer: ReturnType<typeof setTimeout> | null = null
+
+  // Phones cannot see a WebSocket that stopped existing, so the host announces
+  // itself on a fixed interval and they time it out.
+  const heartbeat = setInterval(() => {
+    bus.publish(publicChannel(code), { t: 'ping' } satisfies ToRoom)
+  }, HEARTBEAT_MS)
 
   function snapshot() {
     try {
@@ -181,6 +187,8 @@ export function createHostRuntime(code: string, cb: HostCallbacks): HostRuntime 
     },
     destroy() {
       if (timer) clearTimeout(timer)
+      clearInterval(heartbeat)
+      bus.publish(publicChannel(code), { t: 'gone' } satisfies ToRoom)
       bus.close()
     },
   }

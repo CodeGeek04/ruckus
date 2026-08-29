@@ -84,6 +84,26 @@ function setRoom(next: string) {
   for (const listener of roomListeners) listener()
 }
 
+/** The host drives pacing manually; timers are a backstop, not the conductor. */
+function advanceLabel(phase: string | null): string {
+  switch (phase) {
+    case 'charge':
+      return 'Start voting'
+    case 'testimony':
+      return 'Show evidence'
+    case 'evidence':
+      return 'Let them guess'
+    case 'guess':
+      return 'Reveal'
+    case 'verdict':
+      return 'Scores'
+    case 'scoreboard':
+      return 'Next round'
+    default:
+      return 'Next'
+  }
+}
+
 export default function HostPage() {
   const code = useSyncExternalStore(subscribeRoom, getRoom, getServerRoom)
   const [epoch, setEpoch] = useState(0)
@@ -159,16 +179,32 @@ export default function HostPage() {
     const ended = viewPhase(view) === 'ended'
     return (
       <main className="relative h-full">
-        <div className="absolute right-10 top-8 z-10 text-7xl font-black">
-          <Countdown deadline={ended ? null : deadline} />
+        {/* Reserved lane down the right edge. The screen's own header stops short
+            of it, so the countdown cannot land on top of the round counter. */}
+        <div className="pointer-events-none absolute right-6 top-6 z-10 flex w-28 justify-end">
+          <div className="rounded-2xl bg-black/60 px-5 py-2 text-6xl font-black leading-none backdrop-blur">
+            <Countdown deadline={ended ? null : deadline} />
+          </div>
         </div>
+
         <Screen view={view} />
-        <button
-          onClick={endGame}
-          className="absolute bottom-6 right-8 z-10 rounded-xl border-4 border-white/40 px-6 py-3 text-xl font-black uppercase tracking-widest text-white/70"
-        >
-          End game
-        </button>
+
+        <div className="absolute bottom-6 right-8 z-10 flex items-center gap-3">
+          <button
+            onClick={endGame}
+            className="rounded-xl border-2 border-white/20 px-5 py-3 text-base font-black uppercase tracking-widest text-white/40 transition hover:border-white/40 hover:text-white/70"
+          >
+            End game
+          </button>
+          {!ended && (
+            <button
+              onClick={() => runtime.current?.advance()}
+              className="rounded-xl bg-white px-8 py-3 text-xl font-black uppercase tracking-widest text-black transition active:scale-95"
+            >
+              {advanceLabel(viewPhase(view))}
+            </button>
+          )}
+        </div>
       </main>
     )
   }

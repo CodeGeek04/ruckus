@@ -17,6 +17,7 @@ export default function PlayPage({ params }: { params: Promise<{ code: string }>
   const [deadline, setDeadline] = useState<number | null>(null)
   const [lobby, setLobby] = useState<Player[]>([])
   const [status, setStatus] = useState<'connecting' | 'open' | 'closed'>('connecting')
+  const [hostStatus, setHostStatus] = useState<'live' | 'gone'>('live')
   const client = useRef<PlayerClient | null>(null)
 
   useEffect(() => {
@@ -27,8 +28,16 @@ export default function PlayPage({ params }: { params: Promise<{ code: string }>
         setDeadline(nextDeadline)
         setGameId(nextGameId)
       },
-      onLobby: setLobby,
+      onLobby: (players) => {
+        setLobby(players)
+        // The host went back to its lobby, so drop the last game screen rather
+        // than leaving a dead round on everyone's phone.
+        setView(null)
+        setGameId(null)
+        setDeadline(null)
+      },
       onStatus: setStatus,
+      onHostStatus: setHostStatus,
     })
     client.current = pc
     return () => pc.destroy()
@@ -51,6 +60,20 @@ export default function PlayPage({ params }: { params: Promise<{ code: string }>
         >
           {status === 'open' ? 'Join' : 'Connecting...'}
         </button>
+      </main>
+    )
+  }
+
+  if (hostStatus === 'gone') {
+    return (
+      <main className="flex h-full flex-col items-center justify-center gap-5 p-8 text-center">
+        <p className="text-6xl">📺</p>
+        <p className="text-4xl font-black uppercase leading-tight text-white">Lost the host</p>
+        <p className="max-w-xs text-lg font-bold text-white/60">
+          The big screen stopped responding. If someone closed the tab or the wifi dropped, this will
+          reconnect on its own the moment it is back.
+        </p>
+        <p className="text-sm font-bold uppercase tracking-widest text-white/30">Room {code}</p>
       </main>
     )
   }

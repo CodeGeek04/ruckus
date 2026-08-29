@@ -42,7 +42,7 @@ function VoteBar({ view }: { view: HearsayHostView }) {
 export function HearsayHostScreen({ view }: { view: HearsayHostView }) {
   return (
     <div className="flex h-full flex-col justify-between p-10">
-      <header className="flex items-center justify-between text-white/50">
+      <header className="flex items-center justify-between pr-36 text-white/50">
         <span className="text-2xl font-black uppercase tracking-widest">Hearsay</span>
         <span className="text-2xl font-bold tabular-nums">
           Round {view.roundNumber} of {view.totalRounds}
@@ -114,7 +114,7 @@ export function HearsayHostScreen({ view }: { view: HearsayHostView }) {
         )}
       </main>
 
-      <footer className="flex items-end justify-center gap-8">
+      <footer className="flex items-end justify-center gap-8 pr-64">
         {[...view.players]
           .sort((a, b) => (view.scores[b.id] ?? 0) - (view.scores[a.id] ?? 0))
           .map((player) => (
