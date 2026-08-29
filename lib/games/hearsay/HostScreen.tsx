@@ -86,7 +86,7 @@ export function HearsayHostScreen({ view }: { view: HearsayHostView }) {
           </>
         )}
 
-        {(view.phase === 'verdict' || view.phase === 'scoreboard' || view.phase === 'ended') && (
+        {(view.phase === 'verdict' || view.phase === 'scoreboard') && (
           <>
             <p className="text-3xl font-bold uppercase tracking-widest text-white/50">The charge was</p>
             <p className="max-w-5xl text-7xl font-black leading-tight text-white">{view.question}</p>
@@ -94,6 +94,22 @@ export function HearsayHostScreen({ view }: { view: HearsayHostView }) {
             <p className={`text-6xl font-black uppercase ${view.accusedPickedCorrectly ? 'text-green-400' : 'text-red-500'}`}>
               {view.accusedPickedCorrectly ? `${view.accusedName} knew it` : `${view.accusedName} had no idea`}
             </p>
+          </>
+        )}
+
+        {view.phase === 'ended' && (
+          <>
+            <p className="text-4xl font-bold uppercase tracking-widest text-white/50">Final verdict</p>
+            {[...view.players]
+              .sort((a, b) => (view.scores[b.id] ?? 0) - (view.scores[a.id] ?? 0))
+              .map((player, index) => (
+                <div key={player.id} className="flex items-center gap-6 text-6xl font-black">
+                  <span className="w-16 text-white/30 tabular-nums">{index + 1}</span>
+                  <span className="h-10 w-10 rounded-full" style={{ backgroundColor: player.color }} />
+                  <span className={index === 0 ? 'text-yellow-400' : 'text-white'}>{player.name}</span>
+                  <span className="tabular-nums text-white/60">{view.scores[player.id] ?? 0}</span>
+                </div>
+              ))}
           </>
         )}
       </main>

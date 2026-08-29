@@ -3,6 +3,7 @@
 import { QrCode } from '@/components/QrCode'
 import { Countdown } from '@/components/Countdown'
 import { PlayerChip } from '@/components/PlayerChip'
+import { setHearsayTone } from '@/lib/games/hearsay'
 import { GAMES } from '@/lib/games/registry'
 import { newRoomCode } from '@/lib/ids'
 import {
@@ -13,6 +14,7 @@ import {
   type HostSnapshot,
 } from '@/lib/runtime/hostRuntime'
 import { viewPhase } from '@/lib/runtime/protocol'
+import { playSound } from '@/lib/sound'
 import type { GameModule, Player } from '@/lib/types'
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 
@@ -90,6 +92,7 @@ export default function HostPage() {
   const [game, setGame] = useState<GameModule<any, any, any, any> | null>(null)
   const [view, setView] = useState<unknown>(null)
   const [deadline, setDeadline] = useState<number | null>(null)
+  const [tone, setTone] = useState<'mild' | 'spicy'>('mild')
   const runtime = useRef<HostRuntime | null>(null)
 
   useEffect(() => {
@@ -112,7 +115,7 @@ export default function HostPage() {
         setDeadline(nextDeadline)
       },
       onGame: setGame,
-      onSound: () => {},
+      onSound: playSound,
     })
     runtime.current = rt
 
@@ -189,6 +192,23 @@ export default function HostPage() {
         {players.length === 0 && (
           <p className="text-3xl font-bold text-white/30">Waiting for players...</p>
         )}
+      </div>
+
+      <div className="flex gap-3">
+        {(['mild', 'spicy'] as const).map((option) => (
+          <button
+            key={option}
+            onClick={() => {
+              setTone(option)
+              setHearsayTone(option)
+            }}
+            className={`rounded-xl border-4 px-8 py-3 text-xl font-black uppercase ${
+              tone === option ? 'border-white bg-white text-black' : 'border-white/30 text-white/50'
+            }`}
+          >
+            {option}
+          </button>
+        ))}
       </div>
 
       <button
