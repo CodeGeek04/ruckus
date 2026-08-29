@@ -7,11 +7,11 @@ describe('channels', () => {
   })
 
   it('puts each player on their own nested channel', () => {
-    expect(privateChannel('BLOB', 'p_abc')).toBe('/room/BLOB/p/p_abc')
+    expect(privateChannel('BLOB', 'p-abc')).toBe('/room/BLOB/p/p-abc')
   })
 
   it('uppercases the code so a typed lowercase code still joins', () => {
     expect(publicChannel('blob')).toBe('/room/BLOB')
-    expect(privateChannel('blob', 'p_abc')).toBe('/room/BLOB/p/p_abc')
+    expect(privateChannel('blob', 'p-abc')).toBe('/room/BLOB/p/p-abc')
   })
 })
