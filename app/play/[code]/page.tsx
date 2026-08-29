@@ -3,6 +3,7 @@
 import { Countdown } from '@/components/Countdown'
 import { GAMES } from '@/lib/games/registry'
 import { createPlayerClient, type PlayerClient } from '@/lib/runtime/playerClient'
+import { viewPhase } from '@/lib/runtime/protocol'
 import type { Player } from '@/lib/types'
 import { use, useEffect, useRef, useState } from 'react'
 
@@ -12,6 +13,7 @@ export default function PlayPage({ params }: { params: Promise<{ code: string }>
   const [me, setMe] = useState<Player | null>(null)
   const [name, setName] = useState('')
   const [view, setView] = useState<unknown>(null)
+  const [gameId, setGameId] = useState<string | null>(null)
   const [deadline, setDeadline] = useState<number | null>(null)
   const [lobby, setLobby] = useState<Player[]>([])
   const [status, setStatus] = useState<'connecting' | 'open' | 'closed'>('connecting')
@@ -20,9 +22,10 @@ export default function PlayPage({ params }: { params: Promise<{ code: string }>
   useEffect(() => {
     const pc = createPlayerClient(code, {
       onAccepted: setMe,
-      onView: (nextView, nextDeadline) => {
+      onView: (nextView, nextDeadline, nextGameId) => {
         setView(nextView)
         setDeadline(nextDeadline)
+        setGameId(nextGameId)
       },
       onLobby: setLobby,
       onStatus: setStatus,
@@ -61,12 +64,17 @@ export default function PlayPage({ params }: { params: Promise<{ code: string }>
     )
   }
 
-  const Screen = GAMES.hearsay.PlayerScreen
+  // The wire carries the game id, so the phone never has to know which game
+  // the host picked. An id this build does not have simply renders nothing.
+  const gameModule = gameId ? GAMES[gameId] : undefined
+  if (!gameModule) return null
+  const Screen = gameModule.PlayerScreen
+  const ended = viewPhase(view) === 'ended'
 
   return (
     <main className="relative h-full">
       <div className="absolute right-4 top-3 text-2xl font-black">
-        <Countdown deadline={deadline} />
+        <Countdown deadline={ended ? null : deadline} />
       </div>
       <Screen view={view} send={(input: unknown) => client.current?.send(input)} />
     </main>

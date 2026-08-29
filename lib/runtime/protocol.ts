@@ -17,3 +17,14 @@ export type ToRoom =
 export type ToPlayer =
   | { t: 'accepted'; player: Player }
   | { t: 'you'; gameId: string; view: unknown; deadline: number | null }
+
+/**
+ * Reads the `phase` field every game view carries, without knowing the game.
+ * The runtime never clears a deadline, so the pages use this to hide the
+ * countdown once a game has ended.
+ */
+export function viewPhase(view: unknown): string | null {
+  if (!view || typeof view !== 'object') return null
+  const phase = (view as { phase?: unknown }).phase
+  return typeof phase === 'string' ? phase : null
+}

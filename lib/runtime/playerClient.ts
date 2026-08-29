@@ -9,7 +9,7 @@ import type { ToHost, ToPlayer, ToRoom } from './protocol'
 
 export type PlayerCallbacks = {
   onAccepted(player: Player): void
-  onView(view: unknown, deadline: number | null): void
+  onView(view: unknown, deadline: number | null, gameId: string): void
   onLobby(players: Player[]): void
   onStatus(status: 'connecting' | 'open' | 'closed'): void
 }
@@ -42,7 +42,7 @@ export function createPlayerClient(code: string, cb: PlayerCallbacks): PlayerCli
   bus.subscribe(privateChannel(code, playerId), (raw) => {
     const message = raw as ToPlayer
     if (message.t === 'accepted') cb.onAccepted(message.player)
-    if (message.t === 'you') cb.onView(message.view, message.deadline)
+    if (message.t === 'you') cb.onView(message.view, message.deadline, message.gameId)
   })
 
   bus.subscribe(publicChannel(code), (raw) => {

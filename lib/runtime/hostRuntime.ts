@@ -10,8 +10,21 @@ type AnyGame = GameModule<unknown, unknown, unknown, unknown>
 
 export type HostRuntime = {
   start(game: AnyGame): void
+  /**
+   * Picks a room back up from a snapshot after a host refresh. `players` is
+   * part of the snapshot and has to come back too, otherwise nothing is left
+   * to publish the private per-phone views to.
+   */
+  restore(game: AnyGame, state: unknown, players?: Player[]): void
   advance(): void
   destroy(): void
+}
+
+/** The snapshot the host page reads back after a refresh. */
+export type HostSnapshot = {
+  players: Player[]
+  gameId: string | null
+  state: unknown
 }
 
 export type HostCallbacks = {
@@ -21,7 +34,21 @@ export type HostCallbacks = {
   onSound(name: string): void
 }
 
-const SNAPSHOT_KEY = (code: string) => `ruckus:host:${code}`
+export const SNAPSHOT_KEY = (code: string) => `ruckus:host:${code}`
+export const LAST_ROOM_KEY = 'ruckus:host:last'
+
+/**
+ * A restored round has no deadline left in the snapshot, so the phase timer is
+ * restarted from its full duration. Games are free not to expose one, in which
+ * case the round simply waits for the host to advance.
+ */
+function phaseDuration(state: unknown): number | null {
+  if (!state || typeof state !== 'object') return null
+  const shaped = state as { phase?: unknown; config?: { durations?: Record<string, unknown> } }
+  if (typeof shaped.phase !== 'string') return null
+  const ms = shaped.config?.durations?.[shaped.phase]
+  return typeof ms === 'number' && ms > 0 ? ms : null
+}
 
 export function createHostRuntime(code: string, cb: HostCallbacks): HostRuntime {
   const bus: Bus = createBus()
@@ -130,6 +157,15 @@ export function createHostRuntime(code: string, cb: HostCallbacks): HostRuntime 
       cb.onGame(nextGame)
       // init returns its own opening timer, so no duration is duplicated here.
       runCommands(opening.commands as never)
+      push()
+    },
+    restore(nextGame, nextState, nextPlayers) {
+      game = nextGame
+      state = nextState
+      if (nextPlayers) players = nextPlayers
+      cb.onGame(nextGame)
+      const ms = phaseDuration(nextState)
+      if (ms !== null) runCommands([{ kind: 'timer', ms }])
       push()
     },
     advance() {
