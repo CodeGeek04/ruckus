@@ -40,7 +40,8 @@ export type GameModule<State, Input, HostView, PlayerView> = {
   tagline: string
   minPlayers: number
   maxPlayers: number
-  init(players: Player[]): State
+  /** Returns the opening state plus the commands that start the first phase. */
+  init(players: Player[]): Reduced<State>
   reduce(state: State, event: GameEvent<Input>): Reduced<State>
   hostView(state: State): HostView
   playerView(state: State, playerId: PlayerId): PlayerView

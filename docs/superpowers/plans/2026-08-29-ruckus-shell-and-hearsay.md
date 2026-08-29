@@ -249,7 +249,8 @@ export type GameModule<State, Input, HostView, PlayerView> = {
   tagline: string
   minPlayers: number
   maxPlayers: number
-  init(players: Player[]): State
+  /** Returns the opening state plus the commands that start the first phase. */
+  init(players: Player[]): Reduced<State>
   reduce(state: State, event: GameEvent<Input>): Reduced<State>
   hostView(state: State): HostView
   playerView(state: State, playerId: PlayerId): PlayerView
@@ -1004,7 +1005,7 @@ export function pickQuestion({ tone, voterCount, usedQuestionIds }: PickArgs): P
 - [ ] **Step 4: Run the test to verify it passes**
 
 Run: `npm test -- lib/games/hearsay/questions.test.ts`
-Expected: PASS, 10 tests.
+Expected: PASS, 11 tests.
 
 Note: the "few voters" test uses `voterCount: 3`, which is a four player game. The "many voters" test uses `voterCount: 8`. `THIN_EVIDENCE_VOTERS` is 4, so 3 takes the other-family branch and 8 takes the same-family branch. Each family has at least 2 other members, so the preferred pool always has 2 candidates and the fallback is never reached in these tests.
 
@@ -1182,7 +1183,7 @@ export function scoreRound(round: Round, config: HearsayConfig): Record<PlayerId
 - [ ] **Step 4: Run the test to verify it passes**
 
 Run: `npm test -- lib/games/hearsay/scoring.test.ts`
-Expected: PASS, 14 tests.
+Expected: PASS, 13 tests.
 
 - [ ] **Step 5: Commit**
 
@@ -1620,7 +1621,7 @@ export function reduceHearsay(
 - [ ] **Step 4: Run the test to verify it passes**
 
 Run: `npm test -- lib/games/hearsay/reduce.test.ts`
-Expected: PASS, 22 tests.
+Expected: PASS, 24 tests.
 
 - [ ] **Step 5: Run the whole suite**
 
@@ -2033,10 +2034,11 @@ export function createHostRuntime(code: string, cb: HostCallbacks): HostRuntime 
   return {
     start(nextGame) {
       game = nextGame
-      state = nextGame.init(players)
+      const opening = nextGame.init(players)
+      state = opening.state
       cb.onGame(nextGame)
-      // The first phase needs its own timer, which init cannot request.
-      runCommands([{ kind: 'timer', ms: 5000 }])
+      // init returns its own opening timer, so no duration is duplicated here.
+      runCommands(opening.commands as never)
       push()
     },
     advance() {
@@ -2561,7 +2563,7 @@ import type { GameModule } from '@/lib/types'
 import { HearsayHostScreen } from './HostScreen'
 import { HearsayPlayerScreen } from './PlayerScreen'
 import { initHearsay, reduceHearsay } from './reduce'
-import type { HearsayInput, HearsayState } from './state'
+import { DEFAULT_CONFIG, type HearsayInput, type HearsayState } from './state'
 import { hearsayHostView, hearsayPlayerView, type HearsayHostView, type HearsayPlayerView } from './views'
 
 export const hearsay: GameModule<HearsayState, HearsayInput, HearsayHostView, HearsayPlayerView> = {
@@ -2570,7 +2572,10 @@ export const hearsay: GameModule<HearsayState, HearsayInput, HearsayHostView, He
   tagline: 'The room testifies about you. You never hear the charge.',
   minPlayers: 4,
   maxPlayers: 12,
-  init: (players) => initHearsay(players),
+  init: (players) => ({
+    state: initHearsay(players),
+    commands: [{ kind: 'timer', ms: DEFAULT_CONFIG.durations.charge }],
+  }),
   reduce: reduceHearsay,
   hostView: hearsayHostView,
   playerView: hearsayPlayerView,
@@ -3132,20 +3137,27 @@ export function playSound(name: string) {
 In `lib/games/hearsay/index.ts`, replace the `init` line so the host can pass a tone:
 
 ```ts
-  init: (players) => initHearsay(players),
+  init: (players) => ({
+    state: initHearsay(players),
+    commands: [{ kind: 'timer', ms: DEFAULT_CONFIG.durations.charge }],
+  }),
 ```
 
 becomes:
 
 ```ts
-  init: (players) => initHearsay(players, { ...DEFAULT_CONFIG, tone: selectedTone }),
+  init: (players) => {
+    const config = { ...DEFAULT_CONFIG, tone: selectedTone }
+    return {
+      state: initHearsay(players, config),
+      commands: [{ kind: 'timer', ms: config.durations.charge }],
+    }
+  },
 ```
 
 and add, above the module:
 
 ```ts
-import { DEFAULT_CONFIG } from './state'
-
 /**
  * Set by the host lobby before the game starts. A module-level value rather
  * than a parameter, because the GameModule contract deliberately keeps init
