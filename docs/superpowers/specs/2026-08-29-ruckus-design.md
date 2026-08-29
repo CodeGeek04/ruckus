@@ -9,9 +9,11 @@ Status: approved, ready for implementation planning
 
 The pack ships with one flagship game and adds more behind it:
 
-1. **Hearsay** (the submission, built first)
-2. **Ghostwriter** (built second)
+1. **Hearsay** (the submission, and the only game in scope right now)
+2. Parked: **Ghostwriter**, specified below but explicitly not being built yet
 3. Backlog: Hot Potato, Alibi, Telephone, Who Said It
+
+Game two is undecided. Once Hearsay is playable the next brainstorm is aimed at more open-ended, skill-expressing games (2D, Minecraft and Terraria as tone references) rather than another social-deduction round loop.
 
 The judges are the players: the authors' own friend group, all of whom know each other. This is the single most important design fact in this document. It means personal content, jokes that depend on shared history, and games about the people in the room are assets rather than liabilities. A game that a stranger could not play is acceptable here.
 
@@ -172,7 +174,8 @@ With four players over eight rounds, a player is accused twice and testifies six
 
 The bank is where this game lives or dies.
 
-- Around 120 questions, all of the form "who is X most likely to...", "who would X call at 3am", "who does X secretly find annoying".
+- **Ship with 20 hand-written questions.** That is enough for a full game and enough to playtest. The bank grows with a Claude-backed generator that takes a theme and produces more in the same families, run offline as a script. Aiming at 120 eventually, but 20 is the bar for playable.
+- All of the form "who is X most likely to...", "who would X call at 3am", "who does X secretly find annoying".
 - Grouped into **families by shape**, so decoys are drawn coherently. This grouping is what makes the guess a deduction rather than a coin flip.
 - **Decoy difficulty scales with player count.** With few voters the evidence is thin, so decoys come from deliberately different families (one affection-shaped, one conflict-shaped) and the vote pattern is genuinely informative. With many voters the spread carries more signal, so decoys can be near neighbours of the real question.
 - **Tone dial** set in the lobby: mild or spicy.
@@ -183,7 +186,11 @@ The bank is where this game lives or dies.
 
 No typing, no writing, no trivia, no reflexes, no wit. You tap faces. Every player acts in every phase, including the Accused, who is deducing while everyone else is betting. Nobody is eliminated, nobody sits out a round, and the chair rotates by construction rather than by luck. Playable by anyone who can recognise their friends' names.
 
-## Game 2: Ghostwriter
+## Parked: Ghostwriter
+
+Not in scope. Specified here so the design is not lost, but no work starts on it until Hearsay is finished and playtested, and until the next brainstorm decides whether it or a skill-based game is game two.
+
+### Ghostwriter
 
 A human verification test that the humans keep failing. Shared screen styled as a broken CAPTCHA.
 
@@ -265,10 +272,9 @@ On Vercel the AWS profile is replaced by an access key and secret in project env
 ## Build order
 
 1. Shell: rooms, join, lobby, round runtime, scoring, scoreboard, host and phone layouts.
-2. Hearsay, including the question bank.
-3. Playtest with the group. Tune the scoring flag.
-4. Ghostwriter.
-5. Polish: sound, motion, the reveal choreography.
-6. Backlog games if time remains.
+2. Hearsay, including 20 seed questions.
+3. Polish: sound, motion, the reveal choreography.
+4. Playtest with the group. Tune the scoring flag, grow the question bank.
+5. Brainstorm game two. Ghostwriter is a candidate, not a commitment.
 
 Hearsay is built first for two reasons: it is the submission, and it exercises every piece of shell infrastructure while exercising none of the AI risk. Debugging model tone and websockets at the same time, at 3am, is how a 24 hour build fails.
