@@ -119,7 +119,15 @@ export function createHostRuntime(code: string, cb: HostCallbacks): HostRuntime 
     const message = raw as ToHost
 
     if (message.t === 'join') {
-      if (players.some((p) => p.id === message.playerId)) return
+      const existing = players.find((p) => p.id === message.playerId)
+      if (existing) {
+        // Already in. Re-send the acceptance rather than going quiet: the
+        // first one is lost whenever the phone's private subscription is not
+        // acked yet, and a silent host leaves that phone stuck on the join
+        // screen with a button that does nothing however often it is tapped.
+        bus.publish(privateChannel(code, existing.id), { t: 'accepted', player: existing } satisfies ToPlayer)
+        return
+      }
       if (game) return // no late joins mid-game
 
       const player: Player = {
