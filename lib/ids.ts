@@ -11,6 +11,11 @@ export function newRoomCode(): string {
   return out
 }
 
+/**
+ * Hyphen, not underscore: player ids become AppSync Events channel segments
+ * (/room/CODE/p/<id>) and AppSync rejects underscores with
+ * BadRequestException "Invalid Channel Format".
+ */
 export function newPlayerId(): string {
-  return `p_${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36)}`
+  return `p-${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36)}`
 }
