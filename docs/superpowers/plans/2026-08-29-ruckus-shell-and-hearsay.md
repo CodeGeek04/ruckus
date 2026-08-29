@@ -177,7 +177,9 @@ export function newRoomCode(): string {
 }
 
 export function newPlayerId(): string {
-  return `p_${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36)}`
+  // Hyphen, not underscore: player ids become AppSync channel segments and
+  // AppSync rejects underscores with "Invalid Channel Format".
+  return `p-${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36)}`
 }
 ```
 
@@ -288,12 +290,12 @@ describe('channels', () => {
   })
 
   it('puts each player on their own nested channel', () => {
-    expect(privateChannel('BLOB', 'p_abc')).toBe('/room/BLOB/p/p_abc')
+    expect(privateChannel('BLOB', 'p-abc')).toBe('/room/BLOB/p/p-abc')
   })
 
   it('uppercases the code so a typed lowercase code still joins', () => {
     expect(publicChannel('blob')).toBe('/room/BLOB')
-    expect(privateChannel('blob', 'p_abc')).toBe('/room/BLOB/p/p_abc')
+    expect(privateChannel('blob', 'p-abc')).toBe('/room/BLOB/p/p-abc')
   })
 })
 ```
@@ -3265,5 +3267,7 @@ Named here so nobody wonders whether they were forgotten:
 **The reducer is pure and must stay pure.** No `Date.now()`, no `fetch`, no timers inside `reduce`. Timers are requested with a `timer` command and executed by the runtime. This is what makes the phase machine testable without faking a clock.
 
 **Randomness is the one exception.** `pickQuestion` and `buildAccusedOrder` call `Math.random()`. That is deliberate and contained: the tests assert properties across many runs rather than exact sequences.
+
+**AppSync channel format rules, learned the hard way against the live API.** Segments may not contain underscores: `/room/SMOK/p/p_test` returns 400 "Invalid Channel Format" while `/room/SMOK/p/p-test` works. The maximum depth is 4 segments, so `/room/CODE/p/<playerId>` is exactly at the limit and no deeper nesting is available. Any id that ends up in a channel name must be hyphenated.
 
 **Do not add a database.** If something seems to need one, it is a sign that state is leaking out of the host tab, which is the thing this architecture is built to avoid.
