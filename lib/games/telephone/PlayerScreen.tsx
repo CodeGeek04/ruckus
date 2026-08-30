@@ -1,12 +1,18 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { BigButton } from '@/components/BigButton'
-import type { TelephoneInput } from './state'
+import { Button, Field, HUES, Slab, Sticker } from '@/components/kit'
+import { PLACEHOLDER_IMAGE, type TelephoneInput } from './state'
 import type { TelephonePlayerView } from './views'
+import { truncate } from '@/lib/text'
 
 /** How often a phone re-offers a picture the host has not acknowledged. */
 const RESEND_MS = 5000
+
+/** The reducer swaps in a placeholder when the model refuses. Presentation only. */
+function isMissing(url: string | null): boolean {
+  return url === null || url === PLACEHOLDER_IMAGE || url.length === 0
+}
 
 /**
  * The phone that wrote a sentence is the one that turns it into a picture.
@@ -66,6 +72,27 @@ function useImageGeneration(view: TelephonePlayerView, send: (input: TelephoneIn
   }, [pendingKey])
 }
 
+/** A picture the machine never produced, made to look deliberate. */
+function NoPicture({ className = '' }: { className?: string }) {
+  return (
+    <div
+      className={`grid place-items-center text-center ${className}`}
+      style={{ backgroundColor: HUES.red }}
+    >
+      <div>
+        <p className="text-4xl leading-none font-extrabold">¯\_(ツ)_/¯</p>
+        <p className="mt-2 font-mono text-[0.65rem] font-bold tracking-[0.2em] uppercase">
+          no picture. guess anyway.
+        </p>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * The writing screen. Cream, one job, a thumb sized target at the bottom, and
+ * a count you can actually see while you type.
+ */
 function Composer({
   view,
   send,
@@ -75,44 +102,77 @@ function Composer({
 }) {
   const [text, setText] = useState('')
   const describing = view.action === 'describe'
+  const left = view.maxTextLength - text.length
+  const tight = left <= 15
 
   return (
-    <div className="flex h-full flex-col gap-4 p-5">
-      <p className="text-2xl font-black uppercase leading-tight text-white">
-        {describing ? 'What was the sentence?' : 'Write a sentence'}
-      </p>
+    <div
+      className="grid h-full grid-rows-[auto_minmax(0,1fr)_auto] gap-3 p-4"
+      style={{ backgroundColor: 'var(--color-paper)' }}
+    >
+      <header className="flex items-start justify-between gap-3 pr-12">
+        <h2 className="max-w-[14ch] text-2xl leading-[0.95] font-extrabold tracking-tight uppercase">
+          {describing ? 'What was the sentence?' : 'Write a sentence'}
+        </h2>
+        <Sticker tone={describing ? 'blue' : 'orange'} tilt={3}>
+          {describing ? 'guess' : 'start'}
+        </Sticker>
+      </header>
 
-      {view.sourceImage && (
-        <div className="min-h-0 flex-1">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={view.sourceImage}
-            alt="The picture you have to describe"
-            className="h-full w-full rounded-2xl border-4 border-white/20 object-contain"
+      <div className="flex min-h-0 flex-col gap-3">
+        {describing && view.sourceImage && (
+          <Slab tone="chalk" className="min-h-0 flex-1 overflow-hidden p-1.5" tilt={-1}>
+            {isMissing(view.sourceImage) ? (
+              <NoPicture className="h-full w-full" />
+            ) : (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img
+                src={view.sourceImage}
+                alt="The picture you have to describe"
+                className="h-full w-full object-contain"
+              />
+            )}
+          </Slab>
+        )}
+
+        {!describing && (
+          <p className="text-base leading-snug font-bold opacity-65">
+            Anything you like. The stranger the better. A machine is about to have a go at it.
+          </p>
+        )}
+
+        {/* With no picture above it the box takes the whole screen: a big
+            comfortable place to type, not a slot at the top of a blank page. */}
+        <div className={`relative ${describing ? 'shrink-0' : 'min-h-0 flex-1'}`}>
+          <textarea
+            value={text}
+            onChange={(e) => setText(truncate(e.target.value, view.maxTextLength))}
+            placeholder="A cat running a bank..."
+            rows={describing ? 3 : undefined}
+            autoComplete="off"
+            className={`slab w-full resize-none px-4 py-3 pb-8 text-xl leading-snug font-bold placeholder:opacity-35 ${
+              describing ? '' : 'h-full'
+            }`}
+            style={{ backgroundColor: 'var(--color-chalk)' }}
           />
+          <span
+            className="tnum absolute right-4 bottom-4 font-mono text-xs font-bold"
+            style={{ color: tight ? HUES.red : 'var(--color-ink)', opacity: tight ? 1 : 0.5 }}
+          >
+            {text.length} / {view.maxTextLength}
+          </span>
         </div>
-      )}
+      </div>
 
-      {!describing && (
-        <p className="text-lg font-bold text-white/50">
-          Anything you like. The stranger the better.
-        </p>
-      )}
-
-      <input
-        value={text}
-        onChange={(e) => setText(e.target.value.slice(0, view.maxTextLength))}
-        placeholder={describing ? 'A cat running a bank...' : 'A cat running a bank...'}
-        autoComplete="off"
-        className="rounded-2xl border-4 border-white/30 bg-white/5 px-5 py-6 text-2xl font-bold text-white placeholder:text-white/25"
-      />
-      <p className="text-right text-sm font-bold tabular-nums text-white/30">
-        {text.length} / {view.maxTextLength}
-      </p>
-
-      <BigButton disabled={text.trim().length === 0} onClick={() => send({ kind: 'submit', text })}>
-        <span className="block text-center text-2xl font-black uppercase">Send it</span>
-      </BigButton>
+      <Button
+        disabled={text.trim().length === 0}
+        onClick={() => send({ kind: 'submit', text })}
+        tone={describing ? 'blue' : 'orange'}
+        size="lg"
+        className="w-full"
+      >
+        Send it
+      </Button>
     </div>
   )
 }
@@ -132,54 +192,99 @@ export function TelephonePlayerScreen({
 
   if (view.action === 'drawing') {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-6 p-8 text-center">
-        <div className="h-16 w-16 animate-spin rounded-full border-8 border-white/15 border-t-white" />
-        <p className="text-3xl font-black uppercase text-white">Drawing it</p>
-        <p className="max-w-xs text-xl font-bold italic leading-snug text-white/60">
-          &ldquo;{view.myText}&rdquo;
-        </p>
-        <p className="text-sm font-black uppercase tracking-widest text-white/30">
-          {view.drawn} of {view.total} pictures back
-        </p>
-      </div>
+      <Field hue="violet" pattern="stripes">
+        <div className="flex h-full flex-col items-center justify-center gap-5 p-6 text-center">
+          <Sticker tone="chalk" tilt={-4} className="wobble">
+            the machine is thinking
+          </Sticker>
+
+          <Slab tone="paper" className="max-w-xs px-5 py-4" tilt={-1}>
+            <p className="text-xl leading-snug font-extrabold">&ldquo;{view.myText}&rdquo;</p>
+          </Slab>
+
+          <div className="flex gap-1.5">
+            {Array.from({ length: Math.max(view.total, 1) }).map((_, i) => (
+              <span
+                key={i}
+                className={`slab-sm block h-6 w-8 ${i < view.drawn ? 'pop' : ''}`}
+                style={{
+                  backgroundColor: i < view.drawn ? 'var(--color-ink)' : 'var(--color-chalk)',
+                }}
+              />
+            ))}
+          </div>
+          <p className="tnum font-mono text-xs font-bold tracking-[0.2em] uppercase">
+            {view.drawn} of {view.total} pictures back
+          </p>
+        </div>
+      </Field>
     )
   }
 
   if (view.action === 'vote') {
     return (
-      <div className="flex h-full flex-col gap-3 p-5">
-        <p className="text-2xl font-black uppercase text-white">Best chain?</p>
-        <p className="text-base font-bold text-white/50">You cannot pick your own.</p>
-        <div className="flex flex-col gap-3 overflow-y-auto">
-          {view.voteOptions.map((option) => (
-            <BigButton
-              key={option.index}
-              selected={view.myVote === option.index}
-              onClick={() => send({ kind: 'vote', chainIndex: option.index })}
-            >
-              <span className="flex items-center gap-3">
-                {option.thumbnail && (
-                  /* eslint-disable-next-line @next/next/no-img-element */
-                  <img src={option.thumbnail} alt="" className="h-14 w-14 rounded-lg object-cover" />
-                )}
-                <span className="flex items-center gap-2">
-                  <span className="h-5 w-5 rounded-full" style={{ backgroundColor: option.color }} />
-                  {option.starterName} started it
+      <Field hue="pink">
+        <div className="grid h-full grid-rows-[auto_minmax(0,1fr)] gap-3 p-4">
+          <header className="pr-12">
+            <h2 className="text-2xl leading-none font-extrabold tracking-tight uppercase">Best chain?</h2>
+            <p className="mt-1 font-mono text-xs font-bold lowercase opacity-65">
+              you cannot pick your own
+            </p>
+          </header>
+
+          <div className="flex min-h-0 flex-col gap-3 overflow-y-auto pb-2">
+            {view.voteOptions.map((option) => (
+              <button
+                key={option.index}
+                onClick={() => send({ kind: 'vote', chainIndex: option.index })}
+                className={`slab press flex w-full items-center gap-3 p-2 text-left ${
+                  view.myVote === option.index ? 'ring-4 ring-[var(--color-ink)] ring-inset' : ''
+                }`}
+                style={{
+                  backgroundColor:
+                    view.myVote === option.index ? 'var(--color-yellow)' : 'var(--color-chalk)',
+                }}
+              >
+                <span className="slab-sm block h-16 w-16 shrink-0 overflow-hidden">
+                  {isMissing(option.thumbnail) ? (
+                    <NoPicture className="h-full w-full" />
+                  ) : (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img src={option.thumbnail!} alt="" className="h-full w-full object-cover" />
+                  )}
                 </span>
-              </span>
-            </BigButton>
-          ))}
+                <span className="flex items-center gap-2 text-lg font-extrabold uppercase">
+                  <span
+                    className="block h-4 w-4 shrink-0"
+                    style={{ backgroundColor: option.color, borderRadius: 999 }}
+                  />
+                  {option.starterName}
+                </span>
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      </Field>
     )
   }
 
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-4 p-8 text-center">
-      <p className="text-4xl font-black uppercase leading-tight text-white">
-        {view.phase === 'reveal' ? 'Watch the screen' : view.phase === 'ended' ? 'Thanks for playing' : 'Hold tight'}
-      </p>
-      <p className="text-6xl font-black tabular-nums text-white/80">{view.myScore}</p>
-    </div>
+    <Field hue={view.phase === 'ended' ? 'lime' : 'yellow'} pattern="dots">
+      <div className="flex h-full flex-col items-center justify-center gap-5 p-6 text-center">
+        <h2 className="max-w-[12ch] text-4xl leading-[0.95] font-extrabold tracking-tight uppercase">
+          {view.phase === 'reveal'
+            ? 'Watch the screen'
+            : view.phase === 'ended'
+              ? 'Thanks for playing'
+              : 'Hold tight'}
+        </h2>
+        <Slab tone="chalk" className="px-8 py-4" tilt={-2}>
+          <p className="font-mono text-[0.65rem] font-bold tracking-[0.25em] uppercase opacity-55">
+            your score
+          </p>
+          <p className="tnum text-6xl font-extrabold">{view.myScore}</p>
+        </Slab>
+      </div>
+    </Field>
   )
 }

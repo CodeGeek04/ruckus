@@ -1,4 +1,5 @@
 // lib/games/telephone/reduce.ts
+import { truncate } from '@/lib/text'
 import type { Command, GameEvent, Player, PlayerId, Reduced } from '@/lib/types'
 import { chainForPlayer, playerForChain, stepCount } from './chains'
 import {
@@ -178,7 +179,10 @@ function advance(state: TelephoneState): Reduced<TelephoneState> {
 
 function cleanText(text: unknown, config: TelephoneConfig): string {
   if (typeof text !== 'string') return ''
-  return text.replace(/\s+/g, ' ').trim().slice(0, config.maxTextLength)
+  // truncate, not slice: a sentence cut through the middle of an emoji ends in
+  // a lone surrogate, and AppSync rejects an event carrying one outright, so
+  // the whole round would have gone out with a hole in it.
+  return truncate(text.replace(/\s+/g, ' ').trim(), config.maxTextLength)
 }
 
 /**

@@ -461,30 +461,35 @@ async function duplicateNames(browser) {
   }
 
   if (!(await pickAndStart(host, 'Hearsay'))) return cleanup([hostCtx, ...phones.map((p) => p.ctx)])
-  for (let i = 0; i < 6; i++) await hearsayStep(host, phones)
-  await shot(host, 'mid-game')
 
   // Both Sams must be independently votable, or one of them cannot be accused.
-  const voter = phones.find((p) => p.name !== 'Sam')
-  const found = await voter.page
-    .waitForFunction(() => document.querySelectorAll('main button').length >= 4, { timeout: 30000 })
-    .then(() => true)
-    .catch(() => false)
-  if (!found) {
-    fail('never found a phone showing the full list of vote targets')
-  } else {
-    const swatches = await voter.page.evaluate(() =>
-      [...document.querySelectorAll('main button')].map((b) => {
-        const dot = b.querySelector('span[style*="background"]')
-        return dot ? getComputedStyle(dot).backgroundColor : null
-      })
-    )
-    const real = swatches.filter(Boolean)
-    if (real.length >= 4 && new Set(real).size !== real.length) {
-      fail(`two vote targets look identical: ${real.join(' / ')}`)
+  // Catch a phone while it is actually showing the target list, whichever
+  // phase that happens to be.
+  let sawTargets = false
+  for (let i = 0; i < 10 && !sawTargets; i++) {
+    for (const p of phones) {
+      const swatches = await p.page
+        .evaluate(() =>
+          [...document.querySelectorAll('main button')]
+            .map((b) => {
+              const dot = b.querySelector('[style*="background"]')
+              return dot ? getComputedStyle(dot).backgroundColor : null
+            })
+            .filter(Boolean)
+        )
+        .catch(() => [])
+      if (swatches.length < 4) continue
+      sawTargets = true
+      if (new Set(swatches).size !== swatches.length) {
+        fail(`two vote targets look identical: ${swatches.join(' / ')}`)
+      }
+      note(`vote target swatches: ${swatches.join(' / ')}`)
+      break
     }
-    note(`vote target swatches: ${real.join(' / ') || 'none rendered'}`)
+    await hearsayStep(host, phones)
   }
+  if (!sawTargets) fail('never found a phone showing the full list of vote targets')
+  await shot(host, 'mid-game')
   await checkLayout(host, 'host with duplicate names')
 
   await cleanup([hostCtx, ...phones.map((p) => p.ctx)])
@@ -659,7 +664,7 @@ async function nastyNames(browser) {
   await cleanup([hostCtx, ...phones.map((p) => p.ctx)])
 }
 
-/** 9. Broken Telephone sentences at the limit and made only of spaces. */
+/** 9. Broken Telephone sentences at the limit, in emoji, and made only of spaces. */
 async function telephoneText(browser) {
   const { ctx: hostCtx, page: host, code } = await openHost(browser)
   const phones = []
@@ -668,58 +673,101 @@ async function telephoneText(browser) {
   if (!(await pickAndStart(host, 'Broken Telephone'))) return cleanup([hostCtx, ...phones.map((p) => p.ctx)])
   await sleep(1500)
 
-  const box = phones[0].page.locator('main input').first()
-  await box.waitFor({ timeout: 20000 })
+  const composerOf = (p) => p.page.locator('main textarea, main input:not([type=file])').first()
+  const sendOf = (p) => p.page.locator('main button', { hasText: /send/i }).first()
+
+  const box = composerOf(phones[0])
+  await box.waitFor({ timeout: 30000 })
 
   // Only spaces: the phone must refuse it rather than pretending it landed.
   await box.fill('        ')
   await sleep(300)
-  const sendBtn = phones[0].page.locator('main button').first()
-  if (!(await sendBtn.isDisabled())) {
-    await sendBtn.click().catch(() => {})
-    await sleep(2500)
-    const stuck = await phones[0].page.evaluate(() => document.body.innerText)
-    if (/Drawing it/i.test(stuck)) {
+  if (!(await sendOf(phones[0]).isDisabled())) {
+    await sendOf(phones[0]).click().catch(() => {})
+    await sleep(3000)
+    const after = await phones[0].page.evaluate(() => document.body.innerText)
+    if (/drawing/i.test(after)) {
       fail('a sentence of only spaces was accepted by the phone and silently dropped by the host')
     } else {
       fail('the send button is enabled for a sentence of only spaces')
     }
   }
 
-  // Exactly the limit. The counter says what the limit is, so read it.
-  const limit = Number((await phones[0].page.locator('main p.text-right').textContent()).split('/')[1].trim())
-  const exact = 'x'.repeat(limit)
-  await box.fill(exact)
+  // The counter tells us the limit, whatever the layout looks like.
+  const limit = await phones[0].page.evaluate(() => {
+    for (const el of document.querySelectorAll('main *')) {
+      const m = (el.textContent ?? '').trim().match(/^\d+ \/ (\d+)$/)
+      if (m && el.children.length === 0) return Number(m[1])
+    }
+    return null
+  })
+  if (!limit) {
+    fail('the composer never showed a character counter, so the limit is unknown')
+    return cleanup([hostCtx, ...phones.map((p) => p.ctx)])
+  }
+  note(`character limit is ${limit}`)
+
+  // Exactly the limit.
+  await box.fill('x'.repeat(limit))
   await sleep(200)
-  const typed = await box.inputValue()
-  if (typed.length !== limit) fail(`typing ${limit} characters left ${typed.length} in the box`)
+  if ((await box.inputValue()).length !== limit) {
+    fail(`typing ${limit} characters left ${(await box.inputValue()).length} in the box`)
+  }
   await checkLayout(phones[0].page, 'phone with a full length sentence')
   await checkTappable(phones[0].page, 'phone with a full length sentence')
   await shot(phones[0].page, 'exact-limit')
-  await phones[0].page.locator('main button').first().click()
+  await sendOf(phones[0]).click()
 
-  // A sentence that is exactly the limit but full of spaces at the edges.
-  await phones[1].page.locator('main input').first().fill(`  ${'y'.repeat(limit - 4)}  `)
-  await phones[1].page.locator('main button').first().click()
-  await phones[2].page.locator('main input').first().fill('a normal sentence about a horse')
-  await phones[2].page.locator('main button').first().click()
+  // The same length in emoji. A naive slice cuts one in half, and the event
+  // that carries it is then rejected outright.
+  // The single leading letter matters: it puts the cut on an odd UTF-16 index,
+  // which is exactly where a naive slice lands inside an emoji.
+  await composerOf(phones[1]).fill(`a${'\u{1F389}'.repeat(limit)}`)
+  await sleep(200)
+  const emojiValue = await composerOf(phones[1]).inputValue()
+  if (/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/.test(emojiValue)) {
+    fail('the composer cut an emoji in half at the character limit')
+  }
+  await sendOf(phones[1]).click()
 
-  await sleep(4000)
+  // Padding at the edges, still exactly the limit.
+  await composerOf(phones[2]).fill(`  ${'y'.repeat(limit - 4)}  `)
+  await sendOf(phones[2]).click()
+
+  await sleep(5000)
   for (const p of phones) {
     const text = await p.page.evaluate(() => document.body.innerText)
-    if (/Write a sentence|What was the sentence/i.test(text)) {
+    if (/write a sentence|what was the sentence/i.test(text)) {
       fail(`${p.name} still sees the composer after sending, so its sentence never landed`)
     }
   }
+  const state = await hostState(host, code)
+  const written = (state?.chains ?? []).filter((c) => c.entries.length > 0).length
+  if (written !== 3) fail(`only ${written} of 3 sentences reached the host`)
   await checkLayout(host, 'telephone host after submits')
   await shot(host, 'after-submits')
 
   // Let the pictures actually generate. This is the real wait, never skipped.
   const drew = await host
-    .waitForFunction(() => /Step 2 of|The reveal/i.test(document.body.innerText), { timeout: 120000 })
+    .waitForFunction(
+      (c) => {
+        const raw = localStorage.getItem(`ruckus:host:${c}`)
+        if (!raw) return false
+        const s = JSON.parse(raw).state
+        return s && (s.stepIndex > 0 || s.phase === 'reveal')
+      },
+      code,
+      { timeout: 150000 }
+    )
     .then(() => true)
     .catch(() => false)
-  if (!drew) fail('telephone never got past the first drawing step within 120s')
+  if (!drew) fail('telephone never got past the first drawing step within 150s')
+
+  const after = await hostState(host, code)
+  const missing = (after?.chains ?? []).filter((c) => !c.entries[0]?.imageUrl).length
+  if (missing) fail(`${missing} chain(s) came out of the drawing step with no picture at all`)
+  const failed = (after?.chains ?? []).filter((c) => c.entries[0]?.failed).length
+  if (failed) note(`${failed} of 3 pictures fell back to the placeholder`)
   await checkLayout(host, 'telephone host after drawing')
   await shot(host, 'after-drawing')
 

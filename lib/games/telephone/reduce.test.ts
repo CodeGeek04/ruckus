@@ -374,3 +374,42 @@ describe('a whole game on timers alone', () => {
     expect(reduceTelephone(state, { type: 'hostAdvance' }).state).toBe(state)
   })
 })
+
+describe('sentences that would break the wire', () => {
+  it('keeps a sentence at exactly the character limit', () => {
+    const state = initTelephone(players)
+    const text = 'x'.repeat(state.config.maxTextLength)
+    const next = reduceTelephone(state, {
+      type: 'input',
+      playerId: players[0].id,
+      payload: { kind: 'submit', text },
+    }).state
+    expect(next.chains[0].entries[0].text).toBe(text)
+  })
+
+  it('never cuts an emoji sentence in half at the limit', () => {
+    // A lone surrogate makes AppSync reject the event that carries the round,
+    // so the sentence would vanish and the writer would sit on the composer.
+    const state = initTelephone(players)
+    const lone = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/
+    const text = `a${'\u{1F389}'.repeat(state.config.maxTextLength)}`
+    const next = reduceTelephone(state, {
+      type: 'input',
+      playerId: players[0].id,
+      payload: { kind: 'submit', text },
+    }).state
+    const stored = next.chains[0].entries[0].text
+    expect(stored).not.toMatch(lone)
+    expect([...stored].length).toBeLessThanOrEqual(state.config.maxTextLength)
+  })
+
+  it('ignores a sentence that is nothing but spaces', () => {
+    const state = initTelephone(players)
+    const next = reduceTelephone(state, {
+      type: 'input',
+      playerId: players[0].id,
+      payload: { kind: 'submit', text: '        ' },
+    }).state
+    expect(next.chains[0].entries).toHaveLength(0)
+  })
+})
