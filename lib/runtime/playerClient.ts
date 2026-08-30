@@ -29,6 +29,9 @@ const IDENTITY_KEY = (code: string) => `ruckus:player:${code.toUpperCase()}`
 /** How often an unanswered join is offered again. */
 const ANNOUNCE_MS = 2000
 
+/** How long a phone keeps re-announcing after a reconnect, answered or not. */
+const REANNOUNCE_WINDOW_MS = 9000
+
 function loadIdentity(code: string): { playerId: string; name: string } | null {
   try {
     const raw = localStorage.getItem(IDENTITY_KEY(code))
@@ -71,9 +74,18 @@ export function createPlayerClient(code: string, cb: PlayerCallbacks): PlayerCli
   let myName: string | null = saved?.name ?? null
   let accepted = false
   let rejected = false
+  /**
+   * Announcements keep going for a few seconds after every reconnect even once
+   * the host has answered. The host replies with two separate messages, an
+   * acceptance and the current view, and losing only the second one used to
+   * leave a phone that believed it was in staring at a round from before it
+   * dropped, with the retry already switched off by the acceptance.
+   */
+  let announceUntil = 0
 
   function announce() {
-    if (!myName || accepted || rejected) return
+    if (!myName || rejected) return
+    if (accepted && Date.now() > announceUntil) return
     bus.publish(publicChannel(code), { t: 'join', playerId, name: myName } satisfies ToHost)
   }
 
@@ -83,6 +95,7 @@ export function createPlayerClient(code: string, cb: PlayerCallbacks): PlayerCli
     // it was down is gone. Ask again.
     if (status === 'open') {
       accepted = false
+      announceUntil = Date.now() + REANNOUNCE_WINDOW_MS
       announce()
     }
   })
