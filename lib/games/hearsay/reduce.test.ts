@@ -227,3 +227,48 @@ describe('round transitions', () => {
     expect(state.phase).toBe('testimony')
   })
 })
+
+describe('inputs from people who are not in the game', () => {
+  it('ignores a vote from an id the game has never heard of', () => {
+    // The public channel is open to anyone with the room code. An outsider's
+    // vote used to land in round.votes, skew the tally the room reads off the
+    // screen, and earn them read-the-room points.
+    const state = { ...stateWithAccused('sam'), phase: 'testimony' as const }
+    const next = reduceHearsay(state, {
+      type: 'input',
+      playerId: 'gatecrasher',
+      payload: { kind: 'vote', targetId: 'mike' },
+    }).state
+
+    expect(next.rounds[0].votes).toEqual({})
+    expect(next.scores.gatecrasher).toBeUndefined()
+  })
+
+  it('ignores a prediction and a guess from an outsider', () => {
+    const state = { ...stateWithAccused('sam'), phase: 'guess' as const }
+
+    const predicted = reduceHearsay(state, {
+      type: 'input',
+      playerId: 'gatecrasher',
+      payload: { kind: 'predict', willGetIt: true },
+    }).state
+    expect(predicted.rounds[0].predictions).toEqual({})
+
+    const guessed = reduceHearsay(state, {
+      type: 'input',
+      playerId: 'gatecrasher',
+      payload: { kind: 'guess', questionId: state.rounds[0].question.id },
+    }).state
+    expect(guessed.rounds[0].accusedPick).toBeNull()
+  })
+
+  it('still lets the real players play', () => {
+    const state = { ...stateWithAccused('sam'), phase: 'testimony' as const }
+    const next = reduceHearsay(state, {
+      type: 'input',
+      playerId: 'mike',
+      payload: { kind: 'vote', targetId: 'ron' },
+    }).state
+    expect(next.rounds[0].votes).toEqual({ mike: 'ron' })
+  })
+})

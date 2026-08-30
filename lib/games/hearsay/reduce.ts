@@ -115,6 +115,11 @@ function advance(state: HearsayState): Reduced<HearsayState> {
 }
 
 function applyInput(state: HearsayState, playerId: PlayerId, input: HearsayInput): Reduced<HearsayState> {
+  // Somebody who is not in this game does not get a say. Their vote would have
+  // been counted in the tally the room reads, and scoreRound would have paid
+  // them for it.
+  if (!state.players.some((p) => p.id === playerId)) return { state }
+
   const round = state.rounds[state.roundIndex]
   const isAccused = playerId === round.accusedId
   const voterIds = state.players.filter((p) => p.id !== round.accusedId).map((p) => p.id)

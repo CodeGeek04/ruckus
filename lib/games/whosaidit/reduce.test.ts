@@ -221,6 +221,19 @@ describe('message phase', () => {
     expect(next.rounds[0].guesses.sam).toBeUndefined()
   })
 
+  it('ignores a guess from someone who is not in the game', () => {
+    // Anyone with the room code can publish on the public channel. An
+    // outsider's guess used to be recorded and scored.
+    const state = withAuthor('shivam', 'sam')
+    const next = reduceWhoSaidIt(state, {
+      type: 'input',
+      playerId: 'gatecrasher',
+      payload: { kind: 'guess', target: 'aman' },
+    }).state
+    expect(next.rounds[0].guesses.gatecrasher).toBeUndefined()
+    expect(next.rounds[0].guesses).toEqual({})
+  })
+
   it('ignores a guess at somebody who is not a candidate', () => {
     const state = withAuthor('shivam', 'sam')
     const next = reduceWhoSaidIt(state, {

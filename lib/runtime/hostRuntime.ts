@@ -181,6 +181,10 @@ export function createHostRuntime(code: string, cb: HostCallbacks): HostRuntime 
     }
 
     if (message.t === 'input') {
+      // The public channel is open to anyone holding the room code, so an
+      // input from someone the host has never accepted is not a player acting,
+      // it is noise. Games see only their own roster.
+      if (!players.some((p) => p.id === message.playerId)) return
       dispatch({ type: 'input', playerId: message.playerId, payload: message.payload })
     }
   })

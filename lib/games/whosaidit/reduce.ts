@@ -197,6 +197,8 @@ function applyInput(
   input: WhoSaidItInput
 ): Reduced<WhoSaidItState> {
   if (state.phase !== 'message' || input.kind !== 'guess') return { state }
+  // Only people in the game guess. An outsider's guess would have been scored.
+  if (!state.players.some((p) => p.id === playerId)) return { state }
 
   const round = state.rounds[state.roundIndex]
   if (!round) return { state }
