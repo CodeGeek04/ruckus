@@ -1,0 +1,6 @@
+# pnpm 11 keeps build-script approvals here, not in package.json.
+allowBuilds:
+  unrs-resolver: true
+  esbuild: true
+  '@tailwindcss/oxide': true
+  sharp: true

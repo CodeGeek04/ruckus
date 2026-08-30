@@ -4,7 +4,13 @@ import { QrCode } from '@/components/QrCode'
 import { Countdown } from '@/components/Countdown'
 import { PlayerChip } from '@/components/PlayerChip'
 import { setHearsayTone } from '@/lib/games/hearsay'
-import { WhoSaidItLobbySetup, whoSaidItStatus } from '@/lib/games/whosaidit'
+import {
+  getServerSource,
+  getWhoSaidItSource,
+  subscribeWhoSaidItSource,
+  WhoSaidItLobbySetup,
+  whoSaidItStatus,
+} from '@/lib/games/whosaidit'
 import { GAMES, GAME_ORDER } from '@/lib/games/registry'
 import { newRoomCode } from '@/lib/ids'
 import {
@@ -114,6 +120,11 @@ function advanceLabel(gameId: string | undefined, phase: string | null): string 
   return ADVANCE_LABELS[gameId]?.[phase] ?? 'Next'
 }
 
+const subscribeNothing = () => () => {}
+const getOrigin = () => window.location.origin
+const getHostName = () => window.location.host
+const getEmpty = () => ''
+
 export default function HostPage() {
   const code = useSyncExternalStore(subscribeRoom, getRoom, getServerRoom)
   const [epoch, setEpoch] = useState(0)
@@ -124,6 +135,10 @@ export default function HostPage() {
   const [deadline, setDeadline] = useState<number | null>(null)
   const [tone, setTone] = useState<'mild' | 'spicy'>('spicy')
   const [pick, setPick] = useState<string>('hearsay')
+  // Subscribing matters: without it the readiness check runs once against an
+  // empty chat store and never recomputes, so the lobby panel says "ready" while
+  // the start button stays disabled forever.
+  const chatSource = useSyncExternalStore(subscribeWhoSaidItSource, getWhoSaidItSource, getServerSource)
   const runtime = useRef<HostRuntime | null>(null)
 
   useEffect(() => {
@@ -181,18 +196,24 @@ export default function HostPage() {
     setEpoch((n) => n + 1)
   }, [code, reset])
 
-  const joinUrl = !code || typeof window === 'undefined' ? '' : `${window.location.origin}/play/${code}`
-  // The room needs to know where to type the code, not a brand name.
-  const hostName = typeof window === 'undefined' ? '' : window.location.host
+  // Client-only values read through useSyncExternalStore rather than a bare
+  // window check: /host prerenders, so a bare check renders one thing on the
+  // server and another on the client, which is a hydration mismatch.
+  const origin = useSyncExternalStore(subscribeNothing, getOrigin, getEmpty)
+  const hostName = useSyncExternalStore(subscribeNothing, getHostName, getEmpty)
+  const joinUrl = code && origin ? `${origin}/play/${code}` : ''
   const selected = GAMES[pick]
 
   // Every game needs enough players. Who Said It additionally needs a chat
   // export loaded with enough authors on the answer board, and says so in its
   // own words.
   const enoughPlayers = players.length >= selected.minPlayers
-  const extra = pick === 'whosaidit' ? whoSaidItStatus(players) : { ready: true, reason: '' }
+  const extra = pick === 'whosaidit' && chatSource ? whoSaidItStatus(players) : { ready: pick !== 'whosaidit', reason: pick === 'whosaidit' ? 'Load a chat export' : '' }
   const canStart = enoughPlayers && extra.ready
   const blockedReason = !enoughPlayers ? `Need ${selected.minPlayers} players` : extra.reason
+
+  // Who Said It brings its own author list, which needs the vertical room.
+  const hasSetupPanel = pick === 'whosaidit'
 
   if (game && view) {
     const Screen = game.HostScreen
@@ -233,18 +254,22 @@ export default function HostPage() {
     <main className="grid h-full grid-rows-[auto_minmax(0,1fr)_auto] gap-4 overflow-hidden p-6">
       <h1 className="text-center text-3xl font-black uppercase tracking-[0.3em] text-white/40">Ruckus</h1>
 
-      <div className="flex min-h-0 flex-col items-center justify-center gap-5 overflow-hidden">
+      <div className="flex min-h-0 flex-col items-center justify-center gap-4 overflow-y-auto">
 
       <div className="flex items-center gap-12">
         <div className="text-center">
           <p className="text-xl font-bold uppercase tracking-widest text-white/50">
             Go to <span className="text-white">{hostName}</span> and enter
           </p>
-          <p className="font-mono text-[clamp(4rem,11vw,9rem)] font-black leading-none tracking-widest">
+          <p
+            className={`font-mono font-black leading-none tracking-widest ${
+              hasSetupPanel ? 'text-[clamp(2.5rem,6vw,4.5rem)]' : 'text-[clamp(4rem,11vw,9rem)]'
+            }`}
+          >
             {code ?? '----'}
           </p>
         </div>
-        {joinUrl && <QrCode value={joinUrl} size={180} />}
+        {joinUrl && <QrCode value={joinUrl} size={hasSetupPanel ? 110 : 180} />}
       </div>
 
       <div className="flex flex-wrap items-center justify-center gap-5">
@@ -307,13 +332,18 @@ export default function HostPage() {
         >
           New room
         </button>
-        <button
-          disabled={!canStart}
-          onClick={() => runtime.current?.start(selected)}
-          className="rounded-2xl bg-white px-14 py-5 text-3xl font-black uppercase text-black disabled:opacity-20"
-        >
-          {canStart ? `Start ${selected.name}` : blockedReason}
-        </button>
+        <div className="flex flex-col items-center gap-2">
+          <button
+            disabled={!canStart}
+            onClick={() => runtime.current?.start(selected)}
+            className="rounded-2xl bg-white px-14 py-5 text-3xl font-black uppercase text-black disabled:opacity-20"
+          >
+            Start {selected.name}
+          </button>
+          {!canStart && (
+            <p className="max-w-xl text-center text-sm font-bold text-amber-400">{blockedReason}</p>
+          )}
+        </div>
       </div>
     </main>
   )

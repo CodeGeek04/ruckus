@@ -13,7 +13,14 @@ import {
 
 /** The host lobby renders this to import the chat and pick its authors. */
 export { WhoSaidItLobbySetup } from './LobbySetup'
-export { clearWhoSaidItSource, setWhoSaidItSource, whoSaidItStatus } from './source'
+export {
+  clearWhoSaidItSource,
+  getServerSource,
+  getWhoSaidItSource,
+  setWhoSaidItSource,
+  subscribeWhoSaidItSource,
+  whoSaidItStatus,
+} from './source'
 
 export const whosaidit: GameModule<
   WhoSaidItState,

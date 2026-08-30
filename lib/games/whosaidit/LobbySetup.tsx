@@ -2,7 +2,7 @@
 
 import type { Player, PlayerId } from '@/lib/types'
 import { useCallback, useState, useSyncExternalStore } from 'react'
-import { authorStats, parseWhatsAppExport, type AuthorStat } from './parse'
+import { authorStats, parseWhatsAppExport, type AuthorStat, MIN_AUTHOR_MESSAGES } from './parse'
 import {
   clearWhoSaidItSource,
   getServerSource,
@@ -14,7 +14,6 @@ import {
 import type { AuthorEntry } from './state'
 
 /** Authors quieter than this are not worth a row: they cannot carry a round. */
-const MIN_AUTHOR_MESSAGES = 3
 
 /** Riya Sharma in the chat is very probably Riya in the lobby. */
 function suggest(author: string, players: Player[], taken: Set<PlayerId>): PlayerId | null {

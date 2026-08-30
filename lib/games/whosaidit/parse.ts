@@ -20,6 +20,9 @@ export type AuthorStat = {
 }
 
 /** Below this a message is a reaction, above it nobody reads it off a stream. */
+/** An author with fewer usable messages than this has nothing to serve. */
+export const MIN_AUTHOR_MESSAGES = 3
+
 export const MIN_LENGTH = 25
 export const MAX_LENGTH = 200
 export const MIN_WORDS = 4

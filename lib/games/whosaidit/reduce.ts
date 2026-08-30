@@ -1,6 +1,6 @@
 // lib/games/whosaidit/reduce.ts
 import type { Command, GameEvent, Player, PlayerId, Reduced } from '@/lib/types'
-import { chooseRoundMessages } from './parse'
+import { authorStats, chooseRoundMessages } from './parse'
 import {
   DEFAULT_CONFIG,
   type AuthorKey,
@@ -60,15 +60,24 @@ export function buildRounds(
   // Candidates are chat authors, in the order the lobby lists them, whether or
   // not they turned up to play. Guessing somebody who is not in the room is the
   // point: the whole group chat is fair game.
-  const candidates = Object.entries(source.authors)
-    .filter(([, entry]) => entry?.included)
-    .map(([author]) => author)
+  //
+  // Derived from the messages rather than from the stored record, with the
+  // record acting only as an override. The lobby shows an author with no stored
+  // entry as included, so reading the record alone disagreed with the screen:
+  // a stale or partial record rendered ten ticked authors and counted zero.
+  // Record order first, so the board matches the lobby list, then any author
+  // present in the chat but missing from the record (a stale or partial cache).
+  const recorded = Object.keys(source.authors)
+  const fromMessages = authorStats(source.messages).map((stat) => stat.author)
+  const eligible = [...recorded, ...fromMessages.filter((a) => !recorded.includes(a))]
+
+  const candidates = eligible.filter((author) => source.authors[author]?.included !== false)
 
   // A link to somebody who left the lobby between the upload and the start is
   // dropped: it would silence a player who is no longer there.
   const linked = new Map<AuthorKey, PlayerId>()
   for (const author of candidates) {
-    const playerId = source.authors[author].playerId
+    const playerId = source.authors[author]?.playerId ?? null
     if (playerId && playerIds.has(playerId)) linked.set(author, playerId)
   }
 
