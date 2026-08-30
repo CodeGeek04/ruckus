@@ -45,7 +45,16 @@ const HEADLINE = 'text-[clamp(2.2rem,6.5vw,5.5rem)] leading-[0.92] font-extrabol
 const SUB = 'text-[clamp(1rem,2vw,1.75rem)] font-extrabold uppercase tracking-tight'
 
 /** One vote, as a brick. Chunky enough to read as an object from four metres. */
-const BRICK = 'w-[clamp(2.75rem,5.5vw,5rem)] h-[clamp(1rem,3vh,2rem)] rounded-[7px]'
+const BRICK = 'w-[clamp(2.5rem,5.5vw,5rem)] rounded-[7px]'
+
+/**
+ * A stack is capped in total height, not per brick: seven votes in a four
+ * player room and one vote in an eight player room both have to fit the same
+ * middle row, so the bricks thin out rather than the screen growing.
+ */
+function brickHeight(tallest: number): string {
+  return `clamp(0.5rem, calc(15vh / ${Math.max(1, tallest)}), 2.1rem)`
+}
 
 function totalVotes(view: HearsayHostView): number {
   return Object.values(view.voteCounts).reduce((sum, n) => sum + n, 0)
@@ -61,6 +70,7 @@ function totalVotes(view: HearsayHostView): number {
  */
 function Tally({ view }: { view: HearsayHostView }) {
   const revealed = view.voters !== null
+  const height = brickHeight(Math.max(1, ...view.players.map((p) => view.voteCounts[p.id] ?? 0)))
 
   return (
     // The tally stands on a chalk plinth. Player colours are the same eight
@@ -69,7 +79,7 @@ function Tally({ view }: { view: HearsayHostView }) {
     <Slab
       tone="chalk"
       tilt={-0.6}
-      className="px-[clamp(0.9rem,2.5vw,2.25rem)] py-[clamp(0.5rem,1.5vh,1.1rem)]"
+      className="max-w-full px-[clamp(0.75rem,2.2vw,2.25rem)] py-[clamp(0.5rem,1.6vh,1.2rem)]"
     >
       <div className="flex flex-wrap items-end justify-center gap-x-[clamp(0.6rem,2vw,2rem)] gap-y-2">
         {view.players.map((player) => {
@@ -98,7 +108,7 @@ function Tally({ view }: { view: HearsayHostView }) {
                 {count === 0 && (
                   <div
                     className={`${BRICK} border-[3px] border-dashed opacity-25`}
-                    style={{ borderColor: 'var(--color-ink)' }}
+                    style={{ borderColor: 'var(--color-ink)', height }}
                   />
                 )}
                 {Array.from({ length: count }, (_, i) => {
@@ -110,6 +120,7 @@ function Tally({ view }: { view: HearsayHostView }) {
                       style={{
                         backgroundColor: voter ? voter.color : player.color,
                         borderColor: 'var(--color-ink)',
+                        height,
                         animationDelay: `${i * 60}ms`,
                       }}
                     />
@@ -130,7 +141,14 @@ function Standings({ view, awarded }: { view: HearsayHostView; awarded: boolean 
   const ranked = [...view.players].sort((a, b) => (view.scores[b.id] ?? 0) - (view.scores[a.id] ?? 0))
 
   return (
-    <div className="flex w-full max-w-3xl flex-col gap-[clamp(0.3rem,1vh,0.7rem)]">
+    // Mid game the host frame floats a Next round button in the bottom right
+    // corner, so the table stops short of it rather than running underneath.
+    // At the end that button is gone and the table gets the room back.
+    <div
+      className={`flex w-full max-w-3xl flex-col gap-[clamp(0.3rem,1vh,0.7rem)] ${
+        awarded ? 'pb-[clamp(1.5rem,5vh,3rem)]' : ''
+      }`}
+    >
       {ranked.map((player, index) => (
         <Slab
           key={player.id}
@@ -197,8 +215,8 @@ export function HearsayHostScreen({ view }: { view: HearsayHostView }) {
 
   return (
     <Field hue={PHASE_HUE[view.phase]} pattern={view.phase === 'verdict' ? 'stripes' : 'dots'}>
-      <div className="grid h-full grid-rows-[auto_minmax(0,1fr)_auto] gap-3 overflow-hidden p-8">
-        <header className="flex items-center gap-4 pr-40">
+      <div className="grid h-full grid-cols-[minmax(0,1fr)] grid-rows-[auto_minmax(0,1fr)_auto] gap-[clamp(0.4rem,1.2vh,0.9rem)] overflow-hidden p-[clamp(1rem,2vw,2rem)]">
+        <header className="flex min-w-0 items-center gap-4 pr-40">
           <span className="text-[clamp(1.1rem,1.8vw,1.6rem)] font-extrabold tracking-tighter uppercase">
             Hearsay
           </span>
@@ -210,7 +228,7 @@ export function HearsayHostScreen({ view }: { view: HearsayHostView }) {
           </span>
         </header>
 
-        <main className="flex min-h-0 flex-col items-center justify-center gap-[clamp(0.5rem,2vh,1.5rem)] overflow-hidden text-center">
+        <main className="flex min-h-0 min-w-0 flex-col items-center justify-center gap-[clamp(0.3rem,1.4vh,1.2rem)] overflow-hidden text-center">
           {view.phase === 'charge' && (
             <>
               <Sticker tone="chalk" tilt={-3}>
@@ -280,7 +298,7 @@ export function HearsayHostScreen({ view }: { view: HearsayHostView }) {
                 the charge was
               </Sticker>
               <Slab tone="chalk" className="max-w-4xl px-6 py-3" tilt={-0.8}>
-                <p className="text-[clamp(1.1rem,2.9vw,2.6rem)] leading-tight font-extrabold">
+                <p className="text-[clamp(1rem,2.6vw,2.4rem)] leading-tight font-extrabold">
                   {view.question}
                 </p>
               </Slab>
@@ -313,7 +331,7 @@ export function HearsayHostScreen({ view }: { view: HearsayHostView }) {
           )}
         </main>
 
-        <footer className="flex items-end justify-center gap-[clamp(0.75rem,2.5vw,2.5rem)] pr-[22rem]">
+        <footer className="flex min-w-0 flex-wrap items-center justify-center gap-x-[clamp(0.6rem,2vw,2.25rem)] gap-y-1 pr-[22rem]">
           {view.phase !== 'scoreboard' &&
             view.phase !== 'ended' &&
             [...view.players]
