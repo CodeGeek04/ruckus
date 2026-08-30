@@ -164,6 +164,7 @@ it('plays a whole game of Hearsay over the live bus', async () => {
       onLobby: () => {},
       onStatus: () => {},
       onHostStatus: () => {},
+      onRejected: () => {},
       onView: (raw) => {
         const view = raw as HearsayPlayerView
         playerSamples.push({ name, view })

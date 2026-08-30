@@ -73,6 +73,17 @@ export function createHostRuntime(code: string, cb: HostCallbacks): HostRuntime 
     }
   }
 
+  /** This phone's own view, on its private channel. No-op before a game. */
+  function sendPrivate(player: Player) {
+    if (!game) return
+    bus.publish(privateChannel(code, player.id), {
+      t: 'you',
+      gameId: game.id,
+      view: game.playerView(state, player.id),
+      deadline,
+    } satisfies ToPlayer)
+  }
+
   function broadcast() {
     if (!game) {
       bus.publish(publicChannel(code), { t: 'lobby', players, code } satisfies ToRoom)
@@ -85,14 +96,7 @@ export function createHostRuntime(code: string, cb: HostCallbacks): HostRuntime 
       deadline,
     } satisfies ToRoom)
 
-    for (const player of players) {
-      bus.publish(privateChannel(code, player.id), {
-        t: 'you',
-        gameId: game.id,
-        view: game.playerView(state, player.id),
-        deadline,
-      } satisfies ToPlayer)
-    }
+    for (const player of players) sendPrivate(player)
   }
 
   function push() {
@@ -131,10 +135,23 @@ export function createHostRuntime(code: string, cb: HostCallbacks): HostRuntime 
         // first one is lost whenever the phone's private subscription is not
         // acked yet, and a silent host leaves that phone stuck on the join
         // screen with a button that does nothing however often it is tapped.
+        //
+        // The current view goes with it. A phone re-announces after every
+        // reconnect, and it missed everything published while it was away, so
+        // acceptance on its own would leave it looking at a stale round.
         bus.publish(privateChannel(code, existing.id), { t: 'accepted', player: existing } satisfies ToPlayer)
+        sendPrivate(existing)
         return
       }
-      if (game) return // no late joins mid-game
+      if (game) {
+        // No late joins mid-game. Saying so matters: an unanswered join looks
+        // exactly like a broken room from the phone's side.
+        bus.publish(privateChannel(code, message.playerId), {
+          t: 'rejected',
+          reason: 'The game already started. You are in for the next one.',
+        } satisfies ToPlayer)
+        return
+      }
 
       const player: Player = {
         id: message.playerId,
