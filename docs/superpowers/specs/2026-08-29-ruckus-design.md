@@ -248,6 +248,14 @@ Not in scope for the 24 hours unless the first two land early.
 - **Telephone.** Text to image to text chains. Blocked on an image provider.
 - **Who Said It.** Real messages from the group's chat export. Devastating with friends, unplayable with strangers, needs an export.
 
+## Settled decisions
+
+Confirmed by the owner after the edge-case round. Do not re-open these without asking.
+
+- **Late joiners are refused.** Someone arriving after the game starts is told why, and is admitted automatically when the host returns to the lobby. They are not queued as spectators and not let in on zero points.
+- **Room codes persist across sessions.** The saved code is the room's identity, so a host who comes back later keeps the same code until they press "New room". This is deliberate: it stops a lobby refresh invalidating a code everybody has already typed.
+- **`maxPlayers` is not enforced.** There are 12 player colours, so a 13th player would duplicate one and become hard to tell apart on the shared screen. Accepted: the real group is 8, which is well clear. Enforce it only if a room ever gets close.
+
 ## Deferred decisions
 
 - Ghostwriter confidence tokens (spread three votes instead of one) and the paranoia round (one round with no machine answer at all). Both parked, both additive.
