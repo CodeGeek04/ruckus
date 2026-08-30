@@ -34,18 +34,20 @@ export function createBus(): Bus {
   let statusCb: ((s: 'connecting' | 'open' | 'closed') => void) | null = null
 
   const subs = new Map<string, { channel: string; onEvent: (data: unknown) => void }>()
-  const pending: string[] = []
 
   const setStatus = (s: 'connecting' | 'open' | 'closed') => statusCb?.(s)
 
-  function send(message: object) {
-    const text = JSON.stringify(message)
-    if (ready && ws) ws.send(text)
-    else pending.push(text)
-  }
-
+  /**
+   * Only ever called with the socket up. Nothing is queued while it is down:
+   * `subs` is the single source of truth and the whole map is replayed on every
+   * connection_ack. Queuing as well used to send each subscribe twice, once
+   * from the replay and once from the queue, and AppSync answers a repeated
+   * subscription id with subscribe_error rather than ignoring it, which cost
+   * that phone every message the host sent it.
+   */
   function sendSubscribe(id: string, channel: string) {
-    send({ type: 'subscribe', id, channel, authorization: authHeader })
+    if (!ready || !ws) return
+    ws.send(JSON.stringify({ type: 'subscribe', id, channel, authorization: authHeader }))
   }
 
   function connect() {
@@ -64,12 +66,17 @@ export function createBus(): Bus {
         attempt = 0
         setStatus('open')
         for (const [id, sub] of subs) sendSubscribe(id, sub.channel)
-        while (pending.length) ws!.send(pending.shift()!)
         return
       }
       if (msg.type === 'data') {
         const sub = subs.get(msg.id)
         if (sub) sub.onEvent(JSON.parse(msg.event))
+        return
+      }
+      // A rejected subscription is silent otherwise: the socket stays open and
+      // that one channel simply never delivers anything again.
+      if (msg.type === 'subscribe_error' || msg.type === 'connection_error') {
+        console.error(`[bus] ${msg.type}:`, JSON.stringify(msg.errors ?? msg).slice(0, 200))
       }
     }
 
@@ -93,29 +100,35 @@ export function createBus(): Bus {
       sendSubscribe(id, channel)
       return () => {
         subs.delete(id)
-        send({ type: 'unsubscribe', id })
+        if (ready && ws) ws.send(JSON.stringify({ type: 'unsubscribe', id }))
       }
     },
 
     async publish(channel, data) {
+      // Never rejects. Phones lose the network constantly and every caller
+      // fires and forgets, so a throwing fetch became an unhandled rejection.
       // AppSync answers 200 even when it rejects the event: the rejection is in
       // a failed[] array in the body. Without this check an oversized payload
       // vanishes with no error on either side, which is close to undebuggable.
       // The 240KB event limit is real and reachable, so surface it loudly.
-      const res = await fetch(`https://${HTTP}/event`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY },
-        body: JSON.stringify({ channel, events: [JSON.stringify(data)] }),
-      })
+      try {
+        const res = await fetch(`https://${HTTP}/event`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY },
+          body: JSON.stringify({ channel, events: [JSON.stringify(data)] }),
+        })
 
-      if (!res.ok) {
-        console.error(`[bus] publish to ${channel} failed: HTTP ${res.status}`)
-        return
-      }
+        if (!res.ok) {
+          console.error(`[bus] publish to ${channel} failed: HTTP ${res.status}`)
+          return
+        }
 
-      const body = (await res.json().catch(() => null)) as { failed?: unknown[] } | null
-      if (body?.failed?.length) {
-        console.error(`[bus] publish to ${channel} rejected:`, JSON.stringify(body.failed).slice(0, 300))
+        const body = (await res.json().catch(() => null)) as { failed?: unknown[] } | null
+        if (body?.failed?.length) {
+          console.error(`[bus] publish to ${channel} rejected:`, JSON.stringify(body.failed).slice(0, 300))
+        }
+      } catch {
+        // Offline, or the tab is being torn down. The caller re-announces.
       }
     },
 
