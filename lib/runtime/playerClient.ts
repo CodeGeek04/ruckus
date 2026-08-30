@@ -122,7 +122,10 @@ export function createPlayerClient(code: string, cb: PlayerCallbacks): PlayerCli
       cb.onRejected(message.reason)
     }
     if (message.t === 'you') {
-      accepted = true
+      // Deliberately does not count as acceptance. The page leaves the name
+      // screen on `accepted` and nothing else, so treating a view as an
+      // acknowledgement silenced the retry while the phone sat on the join
+      // button quietly receiving a game it could not show.
       cb.onView(message.view, message.deadline, message.gameId)
     }
   })

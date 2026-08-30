@@ -64,8 +64,11 @@ export function createBus(): Bus {
       if (msg.type === 'connection_ack') {
         ready = true
         attempt = 0
-        setStatus('open')
+        // Subscriptions first, then the status. Anything a listener publishes
+        // on 'open' expects an answer, and an answer sent before the
+        // subscribe frame has gone out has nowhere to land.
         for (const [id, sub] of subs) sendSubscribe(id, sub.channel)
+        setStatus('open')
         return
       }
       if (msg.type === 'data') {
