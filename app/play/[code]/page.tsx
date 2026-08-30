@@ -18,11 +18,15 @@ export default function PlayPage({ params }: { params: Promise<{ code: string }>
   const [lobby, setLobby] = useState<Player[]>([])
   const [status, setStatus] = useState<'connecting' | 'open' | 'closed'>('connecting')
   const [hostStatus, setHostStatus] = useState<'live' | 'gone'>('live')
+  const [rejected, setRejected] = useState<string | null>(null)
   const client = useRef<PlayerClient | null>(null)
 
   useEffect(() => {
     const pc = createPlayerClient(code, {
-      onAccepted: setMe,
+      onAccepted: (player) => {
+        setRejected(null)
+        setMe(player)
+      },
       onView: (nextView, nextDeadline, nextGameId) => {
         setView(nextView)
         setDeadline(nextDeadline)
@@ -30,6 +34,9 @@ export default function PlayPage({ params }: { params: Promise<{ code: string }>
       },
       onLobby: (players) => {
         setLobby(players)
+        // The host is back in its lobby, so whatever it turned this phone away
+        // for is over. The client re-announces on its own.
+        setRejected(null)
         // The host went back to its lobby, so drop the last game screen rather
         // than leaving a dead round on everyone's phone.
         setView(null)
@@ -38,10 +45,22 @@ export default function PlayPage({ params }: { params: Promise<{ code: string }>
       },
       onStatus: setStatus,
       onHostStatus: setHostStatus,
+      onRejected: setRejected,
     })
     client.current = pc
     return () => pc.destroy()
   }, [code])
+
+  if (rejected) {
+    return (
+      <main className="flex h-full flex-col items-center justify-center gap-5 p-8 text-center">
+        <p className="text-6xl">⏳</p>
+        <p className="text-4xl font-black uppercase leading-tight text-white">Already started</p>
+        <p className="max-w-xs text-lg font-bold text-white/60">{rejected}</p>
+        <p className="text-sm font-bold uppercase tracking-widest text-white/30">Room {code}</p>
+      </main>
+    )
+  }
 
   if (!me) {
     return (

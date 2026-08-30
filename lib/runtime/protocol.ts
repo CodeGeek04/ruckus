@@ -26,6 +26,8 @@ export const HOST_TIMEOUT_MS = 11000
 /** Host to one phone, on that phone's private channel. */
 export type ToPlayer =
   | { t: 'accepted'; player: Player }
+  /** Turned up after the game started. The phone shows why rather than hanging. */
+  | { t: 'rejected'; reason: string }
   | { t: 'you'; gameId: string; view: unknown; deadline: number | null }
 
 /**
