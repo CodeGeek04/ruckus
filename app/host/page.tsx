@@ -42,20 +42,28 @@ function readSnapshot(code: string): HostSnapshot | null {
 }
 
 /** The room this browser was last hosting, if it still has a resumable game. */
+/**
+ * The room this browser was last hosting, whether or not a game was running.
+ *
+ * This deliberately does not require a resumable game. The code is printed on
+ * the TV and scanned off it, and everyone in the room has already typed it, so
+ * minting a new one on a refresh strands the whole party on a dead room with a
+ * QR code that no longer goes anywhere. "New room" is how a host asks for a
+ * different code, and it is the only thing that gives one.
+ */
 function resumableCode(): string | null {
   try {
     const last = localStorage.getItem(LAST_ROOM_KEY)
-    if (!last) return null
-    return readSnapshot(last) ? last : null
+    return last && last.length === 4 ? last : null
   } catch {
     return null
   }
 }
 
+/** Drops the saved round. The room code itself survives: see resumableCode. */
 function forget(code: string) {
   try {
     localStorage.removeItem(SNAPSHOT_KEY(code))
-    localStorage.removeItem(LAST_ROOM_KEY)
   } catch {
     // Nothing to forget if storage is unavailable.
   }
@@ -188,6 +196,11 @@ export default function HostPage() {
   /** Abandon a restored room deliberately and hand out a fresh code. */
   const newRoom = useCallback(() => {
     if (code) forget(code)
+    try {
+      localStorage.removeItem(LAST_ROOM_KEY)
+    } catch {
+      // Storage is unavailable, so there was nothing pinning the code anyway.
+    }
     reset()
     setRoom(newRoomCode())
   }, [code, reset])

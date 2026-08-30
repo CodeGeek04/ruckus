@@ -354,6 +354,87 @@ async function hostRefresh(browser) {
   await cleanup([hostCtx, ...phones.map((p) => p.ctx)])
 }
 
+/**
+ * 2b. The host refreshes while still in the lobby. There is no game snapshot to
+ * restore, so the roster starts empty and the phones have to put themselves
+ * back without anyone touching them.
+ */
+async function lobbyReload(browser) {
+  const { ctx: hostCtx, page: host, code } = await openHost(browser)
+  const phones = []
+  for (const n of ['Mittal', 'Sarthak', 'Vamsi', 'Abhishek']) phones.push(await joinPhone(browser, code, n))
+  await sleep(2500)
+  if ((await hostRoster(host, code)).length !== 4) fail('the lobby did not have 4 players before the reload')
+
+  await host.reload({ waitUntil: 'networkidle' })
+  await sleep(8000)
+  await shot(host, 'after-lobby-reload')
+
+  const back = await hostRoster(host, code)
+  if (back.length !== 4) fail(`only ${back.length} of 4 phones found their way back after a lobby reload: ${back.join(', ')}`)
+  if (new Set(back).size !== back.length) fail(`the roster gained duplicates after a lobby reload: ${back.join(', ')}`)
+
+  for (const p of phones) {
+    if (await p.page.locator('main input').count()) fail(`${p.name} was thrown back to the name screen by a lobby reload`)
+  }
+
+  // And the room still starts.
+  if (await pickAndStart(host, 'Hearsay')) {
+    await hearsayStep(host, phones)
+    const state = await hostState(host, code)
+    if (!state) fail('the game did not start after a lobby reload')
+    else if (state.players.length !== 4) fail(`the game started with ${state.players.length} players, expected 4`)
+  }
+  await checkLayout(host, 'host lobby after reload')
+
+  await cleanup([hostCtx, ...phones.map((p) => p.ctx)])
+}
+
+/**
+ * 2c. The host presses End game. Everyone drops back to the same room, keeps
+ * the same code, and the next game starts with the same people.
+ */
+async function endGameAndAgain(browser) {
+  const { ctx: hostCtx, page: host, code } = await openHost(browser)
+  const phones = []
+  for (const n of ['Mittal', 'Sarthak', 'Vamsi', 'Abhishek']) phones.push(await joinPhone(browser, code, n))
+  await sleep(2500)
+  if (!(await pickAndStart(host, 'Hearsay'))) return cleanup([hostCtx, ...phones.map((p) => p.ctx)])
+  for (let i = 0; i < 4; i++) await hearsayStep(host, phones)
+
+  const end = host.locator('button', { hasText: /^End game$/i }).first()
+  if (!(await end.count())) {
+    fail('there is no way to end a running game')
+    return cleanup([hostCtx, ...phones.map((p) => p.ctx)])
+  }
+  await end.click()
+  await sleep(8000)
+  await shot(host, 'after-end-game')
+
+  const codeNow = await host.evaluate(() => localStorage.getItem('ruckus:host:last'))
+  if (codeNow !== code) fail(`ending a game changed the room code from ${code} to ${codeNow}`)
+
+  const back = await hostRoster(host, code)
+  if (back.length !== 4) fail(`only ${back.length} of 4 phones were still in the room after End game: ${back.join(', ')}`)
+  for (const p of phones) {
+    if (await p.page.locator('main input').count()) fail(`${p.name} was thrown back to the name screen by End game`)
+  }
+
+  if (await pickAndStart(host, 'Hearsay')) {
+    await hearsayStep(host, phones)
+    const state = await hostState(host, code)
+    if (!state) fail('a second game would not start after End game')
+    else {
+      if (state.players.length !== 4) fail(`the second game started with ${state.players.length} players`)
+      const carried = Object.values(state.scores ?? {}).filter((n) => n !== 0)
+      if (carried.length) fail(`the second game started with scores already on the board: ${JSON.stringify(state.scores)}`)
+    }
+  }
+  await checkLayout(host, 'host after end game')
+
+  await cleanup([hostCtx, ...phones.map((p) => p.ctx)])
+}
+
 /** 3. A phone drops off the network and comes back with nobody helping it. */
 async function offlineAndBack(browser) {
   const { ctx: hostCtx, page: host, code } = await openHost(browser)
@@ -918,6 +999,8 @@ async function cleanup(contexts) {
 const SCENARIOS = {
   rejoin: rejoinAfterClose,
   hostrefresh: hostRefresh,
+  lobbyreload: lobbyReload,
+  endgame: endGameAndAgain,
   offline: offlineAndBack,
   latejoin: lateJoin,
   samename: duplicateNames,
