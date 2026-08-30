@@ -19,7 +19,9 @@ function Quote({ text }: { text: string | null }) {
   if (!text) return null
   return (
     <Slab tone="chalk" className="px-4 py-3" style={{ borderRadius: '20px 20px 20px 5px' }}>
-      <p className="text-lg leading-snug font-extrabold tracking-tight break-words">{text}</p>
+      <p className="text-[1.3rem] leading-snug font-extrabold tracking-tight break-words">
+        {text}
+      </p>
     </Slab>
   )
 }
@@ -85,12 +87,14 @@ export function WhoSaidItPlayerScreen({
         className="h-full overflow-y-auto"
         style={{ backgroundColor: 'var(--color-paper)' }}
       >
-        <div className="flex min-h-full flex-col gap-4 p-4 pt-12 pb-8">
-          <Quote text={view.message} />
+        <div className="mx-auto flex min-h-full w-full max-w-lg flex-col gap-4 p-4 pt-16 pb-8">
+          <div className="pr-14">
+            <Quote text={view.message} />
+          </div>
           <p className="font-mono text-xs font-bold tracking-[0.25em] uppercase opacity-55">
             who said it
           </p>
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-2.5">
             {view.candidates.map((author) => (
               <Button
                 key={author}
@@ -98,13 +102,13 @@ export function WhoSaidItPlayerScreen({
                 // selected ring: on a cream page a ring alone is too quiet to
                 // read at arm's length.
                 tone={chosen === author ? 'pink' : 'chalk'}
-                size="md"
+                size="sm"
                 selected={chosen === author}
                 onClick={() => {
                   setTapped({ round: view.roundNumber, author })
                   send({ kind: 'guess', target: author })
                 }}
-                className="w-full truncate text-left"
+                className="w-full truncate py-3 text-left text-lg"
               >
                 {author}
               </Button>

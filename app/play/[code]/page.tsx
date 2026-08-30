@@ -162,7 +162,7 @@ export default function PlayPage({ params }: { params: Promise<{ code: string }>
   const ended = viewPhase(view) === 'ended'
 
   return (
-    <main className="relative h-full">
+    <main className="relative mx-auto h-full w-full max-w-lg">
       <div className="pointer-events-none absolute top-3 right-3 z-20">
         <Slab tone="chalk" className="px-3 py-0.5" tilt={3}>
           <Countdown deadline={ended ? null : deadline} className="text-2xl font-extrabold" />

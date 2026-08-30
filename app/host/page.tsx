@@ -128,6 +128,16 @@ function advanceLabel(gameId: string | undefined, phase: string | null): string 
   return ADVANCE_LABELS[gameId]?.[phase] ?? 'Next'
 }
 
+/**
+ * Phases where the round is decided and the scoreboard is the only thing left
+ * before the next one. Skipping straight past it is two clicks saved every
+ * round, and the standings are on screen the whole time anyway.
+ */
+const SKIPPABLE_SCOREBOARD: Record<string, string> = {
+  hearsay: 'verdict',
+  whosaidit: 'reveal',
+}
+
 /** Fixed at mount: a QR that resizes when you change games is the jump. */
 const QR_PX = 132
 
@@ -256,6 +266,19 @@ export default function HostPage() {
           >
             End game
           </button>
+          {!ended && SKIPPABLE_SCOREBOARD[game.id] === viewPhase(view) && (
+            <button
+              onClick={() => {
+                // Through the scoreboard and into the next round. Two separate
+                // advances, so the reducer runs exactly as it would by hand.
+                runtime.current?.advance()
+                runtime.current?.advance()
+              }}
+              className="font-mono text-xs font-bold tracking-widest uppercase underline decoration-2 underline-offset-4 opacity-60 transition-opacity hover:opacity-100"
+            >
+              Next round
+            </button>
+          )}
           {!ended && (
             <Button onClick={() => runtime.current?.advance()} tone="ink" size="md">
               {advanceLabel(game.id, viewPhase(view))}
