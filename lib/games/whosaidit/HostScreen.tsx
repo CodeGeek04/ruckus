@@ -42,14 +42,14 @@ function trim(text: string): string {
 function quoteSize(text: string, dim: boolean): string {
   const n = text.length
   if (dim) {
-    if (n <= 60) return 'clamp(1.3rem, 2.4vw, 2.2rem)'
-    if (n <= 130) return 'clamp(1.05rem, 1.9vw, 1.7rem)'
-    return 'clamp(0.9rem, 1.5vw, 1.35rem)'
+    if (n <= 60) return 'clamp(1.3rem, min(2.4vw, 4.4vh), 3rem)'
+    if (n <= 130) return 'clamp(1.05rem, min(1.9vw, 3.4vh), 2.4rem)'
+    return 'clamp(0.9rem, min(1.5vw, 2.7vh), 1.9rem)'
   }
-  if (n <= 40) return 'clamp(2.6rem, 5.4vw, 5.5rem)'
-  if (n <= 90) return 'clamp(2.1rem, 4.1vw, 4.2rem)'
-  if (n <= 140) return 'clamp(1.7rem, 3.1vw, 3.1rem)'
-  return 'clamp(1.4rem, 2.5vw, 2.4rem)'
+  if (n <= 40) return 'clamp(2.6rem, min(5.4vw, 9.6vh), 7rem)'
+  if (n <= 90) return 'clamp(2.1rem, min(4.1vw, 7.3vh), 5.5rem)'
+  if (n <= 140) return 'clamp(1.7rem, min(3.1vw, 5.5vh), 4.2rem)'
+  return 'clamp(1.4rem, min(2.5vw, 4.4vh), 3.2rem)'
 }
 
 /** The message, as a chat bubble that has been enlarged until it is a poster. */
@@ -82,9 +82,9 @@ function Avatar({ label, color, big = false }: { label: string; color: string; b
       style={{
         backgroundColor: color,
         borderRadius: 999,
-        width: big ? 'clamp(3.2rem,6vw,5.5rem)' : 'clamp(2.4rem,4vw,3.6rem)',
-        height: big ? 'clamp(3.2rem,6vw,5.5rem)' : 'clamp(2.4rem,4vw,3.6rem)',
-        fontSize: big ? 'clamp(1.3rem,2.6vw,2.4rem)' : 'clamp(0.9rem,1.6vw,1.4rem)',
+        width: big ? 'clamp(3.2rem,min(6vw,10.6vh),7rem)' : 'clamp(2.4rem,min(4vw,7vh),4.6rem)',
+        height: big ? 'clamp(3.2rem,min(6vw,10.6vh),7rem)' : 'clamp(2.4rem,min(4vw,7vh),4.6rem)',
+        fontSize: big ? 'clamp(1.3rem,min(2.6vw,4.6vh),3rem)' : 'clamp(0.9rem,min(1.6vw,2.8vh),1.8rem)',
       }}
     >
       {label}
@@ -105,10 +105,10 @@ function Column({
   return (
     <div className="flex min-w-0 flex-col items-center gap-1.5">
       <span
-        className="slab-sm max-w-[11rem] truncate px-3 py-1 font-extrabold uppercase"
+        className="slab-sm max-w-[14rem] truncate px-3 py-1 font-extrabold uppercase"
         style={{
           backgroundColor: correct ? HUES.lime : 'var(--color-chalk)',
-          fontSize: 'clamp(0.75rem,1.25vw,1.05rem)',
+          fontSize: 'clamp(0.75rem,min(1.25vw,2.2vh),1.4rem)',
         }}
       >
         {author}
@@ -135,8 +135,9 @@ function votersFor(view: WhoSaidItHostView, author: AuthorKey): Player[] {
 }
 
 /**
- * The answer board only shows names that were actually chosen, plus the real
- * author. Ten empty columns is a spreadsheet, not a reveal.
+ * The answer board only shows names somebody actually chose. Ten empty columns
+ * is a spreadsheet, and repeating the author under their own stamp when nobody
+ * picked them is just saying the same thing twice.
  */
 function boardFor(view: WhoSaidItHostView): { author: AuthorKey; voters: Player[]; correct: boolean }[] {
   const wrong = view.candidates
@@ -145,9 +146,9 @@ function boardFor(view: WhoSaidItHostView): { author: AuthorKey; voters: Player[
     .filter((c) => c.voters.length > 0)
     .sort((a, b) => b.voters.length - a.voters.length)
 
-  const truth = view.author
-    ? [{ author: view.author, voters: votersFor(view, view.author), correct: true }]
-    : []
+  const right = view.author ? votersFor(view, view.author) : []
+  const truth =
+    view.author && right.length > 0 ? [{ author: view.author, voters: right, correct: true }] : []
 
   return [...truth, ...wrong].slice(0, 6)
 }
@@ -181,7 +182,7 @@ export function WhoSaidItHostScreen({ view }: { view: WhoSaidItHostView }) {
             Who Said It
           </Sticker>
           {view.totalRounds > 0 && (
-            <span className="font-mono text-[clamp(0.8rem,1.4vw,1.15rem)] font-bold tracking-[0.2em] uppercase tabular-nums opacity-70">
+            <span className="font-mono text-[clamp(0.8rem,min(1.4vw,2.5vh),1.6rem)] font-bold tracking-[0.2em] uppercase tabular-nums opacity-70">
               {view.roundNumber} / {view.totalRounds}
             </span>
           )}
@@ -190,12 +191,12 @@ export function WhoSaidItHostScreen({ view }: { view: WhoSaidItHostView }) {
         <section className="flex min-h-0 flex-col items-center justify-center overflow-hidden">
           {broken && (
             <div className="flex flex-col items-center gap-5 text-center">
-              <p className="text-[clamp(2.5rem,6vw,5rem)] leading-none font-extrabold tracking-tighter uppercase">
+              <p className="text-[clamp(2.5rem,min(6vw,10vh),7rem)] leading-none font-extrabold tracking-tighter uppercase">
                 No chat loaded
               </p>
               {view.problem && (
                 <Slab tone="chalk" className="max-w-[60ch] px-8 py-5" tilt={-1}>
-                  <p className="text-[clamp(1rem,2vw,1.6rem)] font-bold">{view.problem}</p>
+                  <p className="text-[clamp(1rem,min(2vw,3.5vh),2.2rem)] font-bold">{view.problem}</p>
                 </Slab>
               )}
             </div>
@@ -206,12 +207,12 @@ export function WhoSaidItHostScreen({ view }: { view: WhoSaidItHostView }) {
               <Sticker tone="yellow" tilt={-2}>
                 Who typed this
               </Sticker>
-              <div className="flex w-full max-w-[min(1120px,94%)] items-center gap-[clamp(0.6rem,1.4vw,1.25rem)]">
+              <div className="flex w-full max-w-[min(1400px,94%)] items-center gap-[clamp(0.6rem,1.4vw,1.25rem)]">
                 <Avatar label="??" color={HUES.yellow} big />
                 <Bubble text={view.message} />
               </div>
               <Slab tone="ink" className="px-[clamp(1rem,2vw,2rem)] py-[clamp(0.3rem,0.9vh,0.7rem)]" tilt={1}>
-                <span className="font-mono text-[clamp(0.9rem,1.7vw,1.5rem)] font-bold tracking-widest uppercase tabular-nums">
+                <span className="font-mono text-[clamp(0.9rem,min(1.7vw,3vh),2.1rem)] font-bold tracking-widest uppercase tabular-nums">
                   {view.guessedCount} of {view.expectedGuesses} locked in
                 </span>
               </Slab>
@@ -220,7 +221,7 @@ export function WhoSaidItHostScreen({ view }: { view: WhoSaidItHostView }) {
 
           {!broken && view.phase === 'reveal' && view.message && view.author && (
             <div className="flex w-full min-h-0 flex-col items-center justify-center gap-[clamp(0.5rem,1.6vh,1.1rem)]">
-              <div className="flex w-full max-w-[min(920px,88%)] items-center gap-[clamp(0.5rem,1vw,0.9rem)]">
+              <div className="flex w-full max-w-[min(1200px,90%)] items-center gap-[clamp(0.5rem,1vw,0.9rem)]">
                 <Avatar label={initials(view.author)} color={HUES.lime} />
                 <Bubble text={view.message} dim />
               </div>
@@ -234,23 +235,28 @@ export function WhoSaidItHostScreen({ view }: { view: WhoSaidItHostView }) {
                   tilt={-2}
                   className="px-[clamp(1rem,3vw,2.75rem)] py-[clamp(0.2rem,1vh,0.7rem)]"
                 >
-                  <span className="block max-w-[16ch] truncate text-[clamp(2rem,5.4vw,4.75rem)] leading-none font-extrabold tracking-tighter uppercase">
+                  <span className="block max-w-[16ch] truncate text-[clamp(2rem,min(5.4vw,9.6vh),7rem)] leading-none font-extrabold tracking-tighter uppercase">
                     {view.author}
                   </span>
                 </Slab>
               </div>
 
               {board.length > 0 && (
-                <div className="flex min-h-0 flex-wrap items-start justify-center gap-[clamp(0.6rem,1.6vw,1.5rem)] overflow-hidden">
-                  {board.map((column) => (
-                    <Column key={column.author} {...column} />
-                  ))}
+                <div className="flex min-h-0 flex-col items-center gap-1.5 overflow-hidden pt-1">
+                  <p className="font-mono text-[clamp(0.6rem,min(1vw,1.8vh),1.05rem)] font-bold tracking-[0.3em] uppercase opacity-55">
+                    the room said
+                  </p>
+                  <div className="flex min-h-0 flex-wrap items-start justify-center gap-[clamp(0.6rem,1.6vw,1.5rem)] overflow-hidden">
+                    {board.map((column) => (
+                      <Column key={column.author} {...column} />
+                    ))}
+                  </div>
                 </div>
               )}
 
               {fooled && (
                 <Slab tone="yellow" tilt={1.5} className="px-[clamp(0.8rem,1.8vw,1.6rem)] py-[clamp(0.15rem,0.7vh,0.5rem)]">
-                  <span className="text-[clamp(0.85rem,1.7vw,1.5rem)] font-extrabold uppercase">
+                  <span className="text-[clamp(0.85rem,min(1.7vw,3vh),2.1rem)] font-extrabold uppercase">
                     {fooled.count} of you looked at that and thought {fooled.authors.join(' or ')}
                   </span>
                 </Slab>
@@ -271,7 +277,7 @@ export function WhoSaidItHostScreen({ view }: { view: WhoSaidItHostView }) {
             ? ranked(view).map((player) => (
                 <div key={player.id} className="flex flex-col items-center gap-0.5">
                   <Face name={player.name} color={player.color} size="sm" dim={!player.connected} />
-                  <span className="text-[clamp(0.8rem,1.3vw,1.1rem)] font-extrabold tabular-nums">
+                  <span className="text-[clamp(0.8rem,min(1.3vw,2.3vh),1.5rem)] font-extrabold tabular-nums">
                     {view.scores[player.id] ?? 0}
                     {view.phase === 'reveal' && (view.awarded[player.id] ?? 0) > 0 && (
                       <span className="pl-1 opacity-70">+{view.awarded[player.id]}</span>
@@ -291,7 +297,7 @@ function Standings({ view }: { view: WhoSaidItHostView }) {
   const order = ranked(view)
   const ended = view.phase === 'ended'
   const wide = order.length > 5
-  const rowSize = order.length > 8 ? 'clamp(0.9rem,1.5vw,1.3rem)' : 'clamp(1.1rem,2.1vw,1.9rem)'
+  const rowSize = order.length > 8 ? 'clamp(0.9rem,min(1.5vw,2.7vh),1.8rem)' : 'clamp(1.1rem,min(2.1vw,3.7vh),2.6rem)'
 
   return (
     <div className="flex w-full min-h-0 flex-col items-center gap-[clamp(0.6rem,2vh,1.5rem)] overflow-hidden">

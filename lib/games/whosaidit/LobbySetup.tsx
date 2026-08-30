@@ -1,5 +1,6 @@
 'use client'
 
+import { Slab, Sticker } from '@/components/kit'
 import type { Player, PlayerId } from '@/lib/types'
 import { useCallback, useState, useSyncExternalStore } from 'react'
 import { authorStats, parseWhatsAppExport, type AuthorStat, MIN_AUTHOR_MESSAGES } from './parse'
@@ -12,8 +13,6 @@ import {
   whoSaidItStatus,
 } from './source'
 import type { AuthorEntry } from './state'
-
-/** Authors quieter than this are not worth a row: they cannot carry a round. */
 
 /** Riya Sharma in the chat is very probably Riya in the lobby. */
 function suggest(author: string, players: Player[], taken: Set<PlayerId>): PlayerId | null {
@@ -43,6 +42,11 @@ export function autoAuthors(stats: AuthorStat[], players: Player[]): Record<stri
   return authors
 }
 
+/**
+ * One line of the checklist. A tick box you want to tap, the name, how much
+ * material that person has, and who they are in the room. Bordered but not
+ * shadowed: these sit inside a scroller and are not slabs in their own right.
+ */
 function AuthorRow({
   stat,
   players,
@@ -54,32 +58,55 @@ function AuthorRow({
   entry: AuthorEntry
   onChange: (entry: AuthorEntry) => void
 }) {
+  const { included } = entry
   return (
-    <div className="flex items-center justify-between gap-4 py-1">
+    <div
+      className="flex min-w-0 items-center gap-2 px-2 py-1 transition-colors"
+      style={{
+        border: '3px solid var(--color-ink)',
+        borderRadius: 12,
+        backgroundColor: included ? 'var(--color-chalk)' : 'transparent',
+        opacity: included ? 1 : 0.55,
+      }}
+    >
       <button
-        onClick={() => onChange({ ...entry, included: !entry.included })}
-        className={`h-7 w-7 shrink-0 rounded-lg border-2 text-sm font-black ${
-          entry.included ? 'border-green-400 bg-green-400 text-black' : 'border-white/20 text-transparent'
-        }`}
-        aria-label={entry.included ? `Exclude ${stat.author}` : `Include ${stat.author}`}
+        onClick={() => onChange({ ...entry, included: !included })}
+        className="press-sm grid h-6 w-6 shrink-0 place-items-center text-sm leading-none font-extrabold"
+        style={{
+          border: '3px solid var(--color-ink)',
+          borderRadius: 8,
+          backgroundColor: included ? 'var(--color-lime)' : 'transparent',
+          boxShadow: included ? '3px 3px 0 var(--color-ink)' : 'none',
+          color: included ? 'var(--color-ink)' : 'transparent',
+        }}
+        aria-label={included ? `Exclude ${stat.author}` : `Include ${stat.author}`}
       >
-        Y
+        ✓
       </button>
+
+      <span className="min-w-0 flex-1 truncate text-sm font-extrabold uppercase">{stat.author}</span>
+
       <span
-        className={`min-w-0 flex-1 truncate text-lg font-black ${entry.included ? 'text-white' : 'text-white/30'}`}
+        className="shrink-0 font-mono text-[0.65rem] font-bold tracking-wider tabular-nums"
+        style={{ opacity: 0.6 }}
+        title={`${stat.usable} usable of ${stat.total} messages`}
       >
-        {stat.author}
+        {stat.usable}/{stat.total}
       </span>
-      <span className="w-28 text-right text-sm font-bold tabular-nums text-white/40">
-        {stat.usable} of {stat.total}
-      </span>
+
       <select
         value={entry.playerId ?? ''}
         onChange={(event) => onChange({ ...entry, playerId: event.target.value || null })}
-        className="w-44 rounded-lg border-2 border-white/20 bg-black px-3 py-2 text-base font-bold text-white"
+        className="w-24 shrink-0 appearance-none px-2 py-1 text-center font-mono text-[0.7rem] font-bold uppercase"
+        style={{
+          border: '3px solid var(--color-ink)',
+          borderRadius: 8,
+          backgroundColor: entry.playerId ? 'var(--color-yellow)' : 'transparent',
+          color: 'var(--color-ink)',
+        }}
         aria-label={`Which player is ${stat.author}`}
       >
-        <option value="">Not playing</option>
+        <option value="">not here</option>
         {players.map((player) => (
           <option key={player.id} value={player.id}>
             {player.name}
@@ -95,6 +122,10 @@ function AuthorRow({
  * because no other game needs a chat import and the shell must not learn about
  * WhatsApp. The file is read with the File API and parsed in this tab: the
  * chat never touches a server.
+ *
+ * It sits in the middle row of the host lobby, which flexes and clips, so this
+ * component owns its own scroller and has a hard height cap. It may never grow
+ * enough to push the Start button off the bottom of the screen.
  */
 export function WhoSaidItLobbySetup({ players }: { players: Player[] }) {
   const source = useSyncExternalStore(subscribeWhoSaidItSource, getWhoSaidItSource, getServerSource)
@@ -125,8 +156,10 @@ export function WhoSaidItLobbySetup({ players }: { players: Player[] }) {
 
   if (source.messages.length === 0) {
     return (
-      <div className="flex flex-col items-center gap-3">
-        <label className="cursor-pointer rounded-xl border-4 border-white/30 px-8 py-3 text-xl font-black uppercase tracking-widest text-white/70 transition hover:border-white hover:text-white">
+      <div className="flex flex-col items-center gap-2">
+        <label className="slab press cursor-pointer px-8 py-4 text-xl font-extrabold tracking-tight uppercase"
+          style={{ backgroundColor: 'var(--color-mint)' }}
+        >
           Load chat export
           <input
             type="file"
@@ -135,46 +168,61 @@ export function WhoSaidItLobbySetup({ players }: { players: Player[] }) {
             onChange={(event) => onFile(event.target.files?.[0] ?? null)}
           />
         </label>
-        <p className="text-sm font-bold uppercase tracking-widest text-white/30">
-          Parsed in this tab. It never leaves this browser.
+        <p className="font-mono text-xs font-bold lowercase opacity-55">
+          parsed in this tab. it never leaves this browser.
         </p>
-        {error && <p className="max-w-xl text-center text-base font-bold text-red-400">{error}</p>}
+        {error && (
+          <Slab tone="red" className="max-w-xl px-4 py-2">
+            <p className="text-center text-sm font-bold">{error}</p>
+          </Slab>
+        )}
       </div>
     )
   }
 
   const stats = authorStats(source.messages).filter((s) => s.usable >= MIN_AUTHOR_MESSAGES)
   const status = whoSaidItStatus(players)
+  const included = stats.filter((s) => (source.authors[s.author] ?? { included: true }).included).length
 
   return (
-    <div className="flex w-full max-w-3xl flex-col items-center gap-3">
-      <p className="text-sm font-bold uppercase tracking-widest text-white/30">
-        Everyone in the chat is an answer. Say who is in the room so they skip their own lines.
-      </p>
-      <div className="max-h-52 w-full overflow-y-auto rounded-2xl border-2 border-white/10 px-4 py-2">
-        {stats.map((stat) => (
-          <AuthorRow
-            key={stat.author}
-            stat={stat}
-            players={players}
-            entry={source.authors[stat.author] ?? { included: true, playerId: null }}
-            onChange={(entry) =>
-              setWhoSaidItSource({
-                messages: source.messages,
-                authors: { ...source.authors, [stat.author]: entry },
-              })
-            }
-          />
-        ))}
-      </div>
+    <div className="flex w-full max-w-5xl flex-col items-center gap-2">
+      {/* Its own scroller with a hard cap. The lobby's middle row is shared
+          with the room code, the faces and the game tiles, so this panel is
+          kept deliberately short: it may never grow enough to shove the Start
+          button off the bottom at 720p. */}
+      <Slab tone="paper" className="w-full p-1.5">
+        <div
+          className={`grid max-h-[min(7rem,10vh)] gap-1.5 overflow-y-auto ${
+            stats.length > 4 ? 'grid-cols-2' : 'grid-cols-1'
+          }`}
+        >
+          {stats.map((stat) => (
+            <AuthorRow
+              key={stat.author}
+              stat={stat}
+              players={players}
+              entry={source.authors[stat.author] ?? { included: true, playerId: null }}
+              onChange={(entry) =>
+                setWhoSaidItSource({
+                  messages: source.messages,
+                  authors: { ...source.authors, [stat.author]: entry },
+                })
+              }
+            />
+          ))}
+        </div>
+      </Slab>
 
-      <div className="flex items-center gap-4">
-        <p className={`text-base font-bold ${status.ready ? 'text-green-400' : 'text-red-400'}`}>
-          {status.ready ? `Ready: ${status.rounds} rounds` : status.reason}
+      <div className="flex flex-wrap items-center justify-center gap-3">
+        <Sticker tone={status.ready ? 'lime' : 'red'} tilt={1.5}>
+          {status.ready ? `${status.rounds} rounds ready` : status.reason}
+        </Sticker>
+        <p className="font-mono text-xs font-bold lowercase opacity-60">
+          {included} of {stats.length} on the board. tick who counts, say who is in the room.
         </p>
         <button
           onClick={clearWhoSaidItSource}
-          className="rounded-lg border-2 border-white/20 px-4 py-2 text-sm font-black uppercase tracking-widest text-white/40"
+          className="font-mono text-xs font-bold tracking-widest uppercase underline decoration-2 underline-offset-4 opacity-45 transition-opacity hover:opacity-90"
         >
           Clear chat
         </button>

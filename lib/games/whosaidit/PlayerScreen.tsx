@@ -1,17 +1,41 @@
 'use client'
 
-import { BigButton } from '@/components/BigButton'
-import type { WhoSaidItInput } from './state'
+import { Button, Field, Slab, Sticker } from '@/components/kit'
+import { useState } from 'react'
+import type { AuthorKey, WhoSaidItInput } from './state'
 import type { WhoSaidItPlayerView } from './views'
 
-/** Mirrored to the phone: Discord compression makes this text unreadable on
- *  the shared screen, and it is the only thing the round is about. */
+/**
+ * The phone for Who Said It.
+ *
+ * The one screen that matters is the guess: cream paper, the message at the
+ * top, and a stack of chunky thumb sized names under it. Everything else is a
+ * drenched full bleed panel, because a phone that has nothing for you to do
+ * should say so loudly and then get out of the way.
+ */
+
+/** Mirrored here because Discord compression makes the shared screen unreadable. */
 function Quote({ text }: { text: string | null }) {
   if (!text) return null
   return (
-    <p className="rounded-2xl bg-white/5 p-4 text-xl font-bold leading-snug text-white">
-      &ldquo;{text}&rdquo;
-    </p>
+    <Slab tone="chalk" className="px-4 py-3" style={{ borderRadius: '20px 20px 20px 5px' }}>
+      <p className="text-lg leading-snug font-extrabold tracking-tight break-words">{text}</p>
+    </Slab>
+  )
+}
+
+/** A whole screen of one colour, for the moments the phone is just an audience. */
+function Panel({
+  hue,
+  children,
+}: {
+  hue: 'pink' | 'yellow' | 'blue' | 'lime' | 'red'
+  children: React.ReactNode
+}) {
+  return (
+    <Field hue={hue}>
+      <div className="flex h-full flex-col items-center justify-center gap-4 p-6 text-center">{children}</div>
+    </Field>
   )
 }
 
@@ -22,40 +46,75 @@ export function WhoSaidItPlayerScreen({
   view: WhoSaidItPlayerView
   send: (input: WhoSaidItInput) => void
 }) {
+  // A tap has to look answered before the host has answered back, so the
+  // choice is held locally and keyed to the round. Presentation only: the
+  // guess that counts is the one the reducer recorded.
+  const [tapped, setTapped] = useState<{ round: number; author: AuthorKey } | null>(null)
+  const chosen = tapped && tapped.round === view.roundNumber ? tapped.author : view.myGuess
+
   if (view.phase === 'ended' && view.totalRounds === 0) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-4 p-8 text-center">
-        <p className="text-4xl font-black uppercase text-white">Nothing to play</p>
-        <p className="text-lg font-bold text-white/50">The host has to load a chat first.</p>
-      </div>
+      <Panel hue="red">
+        <p className="text-4xl leading-none font-extrabold tracking-tighter uppercase">Nothing to play</p>
+        <Slab tone="chalk" className="px-5 py-3">
+          <p className="font-bold">The host has to load a chat first.</p>
+        </Slab>
+      </Panel>
     )
   }
 
+  // You wrote it. You are not guessing, and you are not being asked to.
   if (view.isAuthor && view.phase === 'message') {
     return (
-      <div className="flex h-full flex-col justify-center gap-5 p-5 text-center">
-        <p className="text-4xl font-black uppercase text-yellow-400">You said this</p>
-        <Quote text={view.message} />
-        <p className="text-lg font-bold text-white/50">Say nothing. Let them work.</p>
-      </div>
+      <Panel hue="yellow">
+        <Sticker tone="chalk" tilt={-3}>
+          this one is yours
+        </Sticker>
+        <p className="text-4xl leading-none font-extrabold tracking-tighter uppercase">You typed this</p>
+        <div className="w-full text-left">
+          <Quote text={view.message} />
+        </div>
+        <p className="font-mono text-sm font-bold lowercase opacity-65">say nothing. let them work.</p>
+      </Panel>
     )
   }
 
   if (view.action === 'guess') {
     return (
-      <div className="flex h-full flex-col gap-4 overflow-y-auto p-5">
-        <Quote text={view.message} />
-        <p className="text-sm font-black uppercase tracking-widest text-white/40">Who said it?</p>
-        <div className="flex flex-col gap-3 pb-6">
-          {view.candidates.map((author) => (
-            <BigButton
-              key={author}
-              selected={view.myGuess === author}
-              onClick={() => send({ kind: 'guess', target: author })}
-            >
-              {author}
-            </BigButton>
-          ))}
+      <div
+        className="h-full overflow-y-auto"
+        style={{ backgroundColor: 'var(--color-paper)' }}
+      >
+        <div className="flex min-h-full flex-col gap-4 p-4 pt-12 pb-8">
+          <Quote text={view.message} />
+          <p className="font-mono text-xs font-bold tracking-[0.25em] uppercase opacity-55">
+            who said it
+          </p>
+          <div className="flex flex-col gap-3">
+            {view.candidates.map((author) => (
+              <Button
+                key={author}
+                // The chosen name changes colour as well as taking the kit's
+                // selected ring: on a cream page a ring alone is too quiet to
+                // read at arm's length.
+                tone={chosen === author ? 'pink' : 'chalk'}
+                size="md"
+                selected={chosen === author}
+                onClick={() => {
+                  setTapped({ round: view.roundNumber, author })
+                  send({ kind: 'guess', target: author })
+                }}
+                className="w-full truncate text-left"
+              >
+                {author}
+              </Button>
+            ))}
+          </div>
+          {chosen && (
+            <p className="text-center font-mono text-sm font-bold lowercase opacity-60">
+              locked in. tap another to change it.
+            </p>
+          )}
         </div>
       </div>
     )
@@ -63,20 +122,39 @@ export function WhoSaidItPlayerScreen({
 
   if (view.phase === 'reveal') {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-5 p-6 text-center">
-        <p className="text-2xl font-bold uppercase tracking-widest text-white/50">It was</p>
-        <p className="text-5xl font-black uppercase text-white">{view.authorName}</p>
-        {view.wasCorrect === true && <p className="text-4xl font-black uppercase text-green-400">+500</p>}
-        {view.wasCorrect === false && <p className="text-3xl font-black uppercase text-red-500">Wrong</p>}
-        {view.isAuthor && <p className="text-2xl font-black uppercase text-yellow-400">That was you</p>}
-      </div>
+      <Panel hue={view.wasCorrect === false ? 'red' : 'pink'}>
+        <p className="font-mono text-sm font-bold tracking-[0.3em] uppercase opacity-65">it was</p>
+        <div className="stamp w-full">
+          <Slab tone="chalk" tilt={-2} className="px-4 py-3">
+            <p className="text-4xl leading-none font-extrabold tracking-tighter uppercase break-words">
+              {view.authorName}
+            </p>
+          </Slab>
+        </div>
+        {view.wasCorrect === true && (
+          <Slab tone="lime" className="pop px-6 py-2" tilt={2}>
+            <p className="text-4xl leading-none font-extrabold tabular-nums">+500</p>
+          </Slab>
+        )}
+        {view.wasCorrect === false && (
+          <p className="text-3xl leading-none font-extrabold tracking-tighter uppercase">Not even close</p>
+        )}
+        {view.isAuthor && (
+          <Sticker tone="yellow" tilt={2}>
+            that was you
+          </Sticker>
+        )}
+      </Panel>
     )
   }
 
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-4 p-8 text-center">
-      <p className="text-4xl font-black uppercase text-white">Watch the screen</p>
-      <p className="text-6xl font-black tabular-nums text-white/80">{view.myScore}</p>
-    </div>
+    <Panel hue="blue">
+      <p className="text-3xl leading-none font-extrabold tracking-tighter uppercase">Watch the screen</p>
+      <Slab tone="chalk" className="px-8 py-3" tilt={-1.5}>
+        <p className="text-6xl leading-none font-extrabold tabular-nums">{view.myScore}</p>
+      </Slab>
+      <p className="font-mono text-xs font-bold tracking-[0.25em] uppercase opacity-60">your score</p>
+    </Panel>
   )
 }
