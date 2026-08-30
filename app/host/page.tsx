@@ -146,6 +146,7 @@ export default function HostPage() {
   const [deadline, setDeadline] = useState<number | null>(null)
   const [tone, setTone] = useState<'mild' | 'spicy'>('spicy')
   const [pick, setPick] = useState<string>('hearsay')
+  const [copied, setCopied] = useState(false)
   // Subscribing matters: without it the readiness check runs once against an
   // empty chat store and never recomputes, so the lobby panel says "ready" while
   // the start button stays disabled forever.
@@ -217,7 +218,10 @@ export default function HostPage() {
   // server and another on the client, which is a hydration mismatch.
   const origin = useSyncExternalStore(subscribeNothing, getOrigin, getEmpty)
   const hostName = useSyncExternalStore(subscribeNothing, getHostName, getEmpty)
+  // The QR points at the room directly. The shareable link uses /join so it
+  // survives being lowercased, wrapped or mangled by a chat app.
   const joinUrl = code && origin ? `${origin}/play/${code}` : ''
+  const shareUrl = code && origin ? `${origin}/join?code=${code}` : ''
   const selected = GAMES[pick]
 
   // Every game needs enough players. Who Said It additionally needs a chat
@@ -284,7 +288,7 @@ export default function HostPage() {
        * resized the room code and the QR depending on the selected game, so
        * the whole screen jumped every time somebody changed their mind.
        */}
-      <div className="relative grid min-h-0 grid-rows-[auto_var(--row-players)_var(--row-tiles)_var(--row-options)] content-center items-center justify-items-center gap-5">
+      <div className="relative grid min-h-0 grid-rows-[auto_auto_var(--row-players)_auto_var(--row-options)] content-center items-center justify-items-center gap-5">
         <div className="flex items-center gap-6">
           <Slab tone="chalk" className="px-8 py-3" tilt={-1.5}>
             <p className="text-center font-mono text-[length:var(--text-micro)] font-bold tracking-[0.25em] uppercase opacity-55">
@@ -306,6 +310,23 @@ export default function HostPage() {
           </Slab>
         </div>
 
+        <button
+          onClick={() => {
+            if (!shareUrl) return
+            // Clipboard access can be refused (insecure origin, denied
+            // permission). Falling back to selecting nothing is worse than
+            // saying so, hence the state either way.
+            navigator.clipboard
+              ?.writeText(shareUrl)
+              .then(() => setCopied(true))
+              .catch(() => setCopied(false))
+          }}
+          className="slab-sm press-sm flex items-center gap-2 bg-[var(--color-chalk)] px-4 py-2 font-mono text-[length:var(--text-micro)] font-bold lowercase"
+        >
+          <span className="opacity-55">{copied ? 'copied, paste it in discord' : 'copy join link'}</span>
+          <span aria-hidden>{copied ? '✓' : '⧉'}</span>
+        </button>
+
         <div className="flex w-full items-center justify-center gap-4 overflow-hidden">
           {players.map((player, i) => (
             <div key={player.id} className="rise" style={{ animationDelay: `${i * 55}ms` }}>
@@ -319,7 +340,7 @@ export default function HostPage() {
           )}
         </div>
 
-        <div className="flex flex-wrap justify-center gap-4">
+        <div className="grid min-h-[var(--row-tiles)] grid-cols-3 items-stretch gap-4">
           {GAME_ORDER.map((id, i) => {
             const g = GAMES[id]
             const active = pick === id
@@ -328,17 +349,17 @@ export default function HostPage() {
                 key={id}
                 onClick={() => setPick(id)}
                 aria-pressed={active}
-                className="slab press-sm flex h-[var(--row-tiles)] w-[15.5rem] flex-col justify-center px-5 py-3 text-left transition-transform"
+                className="slab press-sm flex h-full w-full flex-col justify-center px-5 py-4 text-left transition-transform"
                 style={{
                   backgroundColor: active ? `var(--color-${GAME_TONES[id]})` : 'var(--color-chalk)',
                   transform: active ? 'rotate(-1.5deg) scale(1.04)' : `rotate(${i % 2 ? 1 : -1}deg)`,
                   opacity: active ? 1 : 0.85,
                 }}
               >
-                <span className="line-clamp-2 block text-[length:var(--text-lead)] leading-[1.05] font-extrabold uppercase">
+                <span className="block text-[length:var(--text-lead)] leading-[1.05] font-extrabold uppercase text-balance">
                   {g.name}
                 </span>
-                <span className="mt-1 line-clamp-2 block text-[length:var(--text-label)] leading-snug font-semibold opacity-65">
+                <span className="mt-1.5 block text-[length:var(--text-label)] leading-snug font-semibold opacity-65">
                   {g.tagline}
                 </span>
               </button>

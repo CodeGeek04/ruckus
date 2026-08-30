@@ -53,6 +53,7 @@
   /* Tuned so header, join block, players, tiles, options and footer all fit
      inside 720p without clipping, and still feel generous at 1080p. */
   --row-players: clamp(4.6rem, 11vh, 7rem);
+  /* A floor for the tiles row, not a cap: the tiles size to their text. */
   --row-tiles: clamp(6.4rem, 14vh, 9rem);
   --row-options: clamp(6rem, 17vh, 11rem);
 }

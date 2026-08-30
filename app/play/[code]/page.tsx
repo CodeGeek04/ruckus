@@ -9,7 +9,11 @@ import type { Player } from '@/lib/types'
 import { use, useEffect, useRef, useState } from 'react'
 
 export default function PlayPage({ params }: { params: Promise<{ code: string }> }) {
-  const { code } = use(params)
+  // Normalised here too: a link can arrive with a lower case code from a chat
+  // app that helpfully lowercased it, and the channel helpers are case
+  // sensitive about what the host is listening on.
+  const { code: rawCode } = use(params)
+  const code = rawCode.trim().toUpperCase()
 
   const [me, setMe] = useState<Player | null>(null)
   const [name, setName] = useState('')
