@@ -85,7 +85,9 @@ async function main() {
   await host.goto(`${BASE}/host`, { waitUntil: 'networkidle' })
   await sleep(2500)
 
-  const code = (await host.locator('p.font-mono').first().textContent())?.trim()
+  // A dedicated hook, not a class: styling the lobby must not be able to break
+  // the harness, which is exactly what happened when the lobby was redesigned.
+  const code = (await host.locator('[data-room-code]').first().getAttribute('data-room-code'))?.trim()
   if (!code || code.length !== 4 || code === '----') {
     fail(`host never produced a room code (saw "${code}")`)
     await shot(host, 'host-nocode')
