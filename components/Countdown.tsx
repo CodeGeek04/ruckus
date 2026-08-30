@@ -18,7 +18,10 @@ export function Countdown({ deadline, className = '' }: { deadline: number | nul
   const urgent = seconds <= 5
 
   return (
-    <div className={`font-mono tabular-nums ${urgent ? 'text-red-500' : 'text-white'} ${className}`}>
+    <div
+      className={`font-mono tabular-nums ${urgent ? 'shove' : ''} ${className}`}
+      style={{ color: urgent ? 'var(--color-red)' : 'var(--color-ink)' }}
+    >
       {seconds}
     </div>
   )

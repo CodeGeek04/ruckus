@@ -2,7 +2,7 @@
 
 import { QrCode } from '@/components/QrCode'
 import { Countdown } from '@/components/Countdown'
-import { PlayerChip } from '@/components/PlayerChip'
+import { Button, Face, Slab, Sticker } from '@/components/kit'
 import { setHearsayTone } from '@/lib/games/hearsay'
 import {
   getServerSource,
@@ -220,128 +220,142 @@ export default function HostPage() {
     const ended = viewPhase(view) === 'ended'
     return (
       <main className="relative h-full">
-        {/* Reserved lane down the right edge. The screen's own header stops short
-            of it, so the countdown cannot land on top of the round counter. */}
-        <div className="pointer-events-none absolute right-6 top-6 z-10 flex w-28 justify-end">
-          <div className="rounded-2xl bg-black/60 px-5 py-2 text-6xl font-black leading-none backdrop-blur">
-            <Countdown deadline={ended ? null : deadline} />
-          </div>
+        {/* A reserved lane down the right edge. The screen's own header stops
+            short of it, so the clock can never land on the round counter. */}
+        <div className="pointer-events-none absolute top-6 right-6 z-20 w-32 justify-items-end">
+          {!ended && deadline !== null && (
+            <Slab tone="chalk" className="px-5 py-1.5" tilt={3}>
+              <Countdown deadline={deadline} className="tnum text-5xl font-extrabold" />
+            </Slab>
+          )}
         </div>
 
         <Screen view={view} />
 
-        <div className="absolute bottom-6 right-8 z-10 flex items-center gap-3">
+        <div className="absolute right-8 bottom-6 z-20 flex items-center gap-3">
           <button
             onClick={endGame}
-            className="rounded-xl border-2 border-white/20 px-5 py-3 text-base font-black uppercase tracking-widest text-white/40 transition hover:border-white/40 hover:text-white/70"
+            className="font-mono text-xs font-bold tracking-widest uppercase underline decoration-2 underline-offset-4 opacity-45 transition-opacity hover:opacity-90"
           >
             End game
           </button>
           {!ended && (
-            <button
-              onClick={() => runtime.current?.advance()}
-              className="rounded-xl bg-white px-8 py-3 text-xl font-black uppercase tracking-widest text-black transition active:scale-95"
-            >
+            <Button onClick={() => runtime.current?.advance()} tone="ink" size="md">
               {advanceLabel(game.id, viewPhase(view))}
-            </button>
+            </Button>
           )}
         </div>
       </main>
     )
   }
 
+  const GAME_TONES = { hearsay: 'violet', whosaidit: 'mint', telephone: 'orange' } as const
+
   return (
-    <main className="grid h-full grid-rows-[auto_minmax(0,1fr)_auto] gap-4 overflow-hidden p-6">
-      <h1 className="text-center text-3xl font-black uppercase tracking-[0.3em] text-white/40">Ruckus</h1>
+    <main
+      className="grid h-full grid-rows-[auto_minmax(0,1fr)_auto] gap-3 overflow-hidden p-6 transition-colors duration-500"
+      style={{ backgroundColor: 'var(--color-yellow)' }}
+    >
+      <div className="dots pointer-events-none absolute inset-0" aria-hidden />
 
-      <div className="flex min-h-0 flex-col items-center justify-center gap-4 overflow-y-auto">
+      <header className="relative flex items-center justify-between">
+        <h1 className="text-3xl font-extrabold tracking-tighter uppercase">Ruckus</h1>
+        <Sticker tone="pink" tilt={2}>
+          {players.length === 0 ? 'waiting' : `${players.length} in`}
+        </Sticker>
+      </header>
 
-      <div className="flex items-center gap-12">
-        <div className="text-center">
-          <p className="text-xl font-bold uppercase tracking-widest text-white/50">
-            Go to <span className="text-white">{hostName}</span> and enter
-          </p>
-          <p
-            className={`font-mono font-black leading-none tracking-widest ${
-              hasSetupPanel ? 'text-[clamp(2.5rem,6vw,4.5rem)]' : 'text-[clamp(4rem,11vw,9rem)]'
-            }`}
-          >
-            {code ?? '----'}
-          </p>
+      <div className="relative flex min-h-0 flex-col items-center justify-center gap-5 overflow-y-auto">
+        <div className="flex items-center gap-8">
+          <Slab tone="chalk" className="px-8 py-4" tilt={-1.5}>
+            <p className="text-center font-mono text-xs font-bold tracking-[0.25em] uppercase opacity-55">
+              go to {hostName || 'ruckus'}
+            </p>
+            <p
+              className={`text-center font-mono font-bold tracking-[0.15em] tabular-nums ${
+                hasSetupPanel ? 'text-[clamp(2.5rem,6vw,4rem)]' : 'text-[clamp(3.5rem,9vw,7rem)]'
+              }`}
+            >
+              {code ?? '••••'}
+            </p>
+          </Slab>
+          {joinUrl && (
+            <Slab tone="chalk" className="p-2" tilt={2.5}>
+              <QrCode value={joinUrl} size={hasSetupPanel ? 104 : 156} />
+            </Slab>
+          )}
         </div>
-        {joinUrl && <QrCode value={joinUrl} size={hasSetupPanel ? 110 : 180} />}
-      </div>
 
-      <div className="flex flex-wrap items-center justify-center gap-5">
-        {players.map((player) => (
-          <PlayerChip key={player.id} player={player} size="lg" />
-        ))}
-        {players.length === 0 && (
-          <p className="text-2xl font-bold text-white/30">Waiting for players...</p>
-        )}
-      </div>
-
-      <div className="flex flex-wrap justify-center gap-4">
-        {GAME_ORDER.map((id) => {
-          const g = GAMES[id]
-          const active = pick === id
-          return (
-            <button
-              key={id}
-              onClick={() => setPick(id)}
-              className={`w-64 rounded-2xl border-4 px-6 py-4 text-left transition ${
-                active ? 'border-white bg-white text-black' : 'border-white/20 text-white/60 hover:border-white/40'
-              }`}
-            >
-              <span className="block text-2xl font-black uppercase">{g.name}</span>
-              <span className={`block text-sm font-bold ${active ? 'text-black/60' : 'text-white/40'}`}>
-                {g.tagline}
-              </span>
-            </button>
-          )
-        })}
-      </div>
-
-      {pick === 'hearsay' && (
-        <div className="flex gap-3">
-          {(['mild', 'spicy'] as const).map((option) => (
-            <button
-              key={option}
-              onClick={() => {
-                setTone(option)
-                setHearsayTone(option)
-              }}
-              className={`rounded-xl border-4 px-8 py-3 text-xl font-black uppercase ${
-                tone === option ? 'border-white bg-white text-black' : 'border-white/30 text-white/50'
-              }`}
-            >
-              {option}
-            </button>
+        <div className="flex min-h-24 flex-wrap items-center justify-center gap-4">
+          {players.map((player, i) => (
+            <div key={player.id} className="rise" style={{ animationDelay: `${i * 55}ms` }}>
+              <Face name={player.name} color={player.color} size="lg" dim={!player.connected} />
+            </div>
           ))}
+          {players.length === 0 && (
+            <p className="font-mono text-lg font-bold lowercase opacity-45">
+              nobody yet. type the code on your phone.
+            </p>
+          )}
         </div>
-      )}
 
-      {pick === 'whosaidit' && <WhoSaidItLobbySetup players={players} />}
+        <div className="flex flex-wrap justify-center gap-4">
+          {GAME_ORDER.map((id, i) => {
+            const g = GAMES[id]
+            const active = pick === id
+            return (
+              <button
+                key={id}
+                onClick={() => setPick(id)}
+                className="slab press-sm w-60 px-5 py-4 text-left transition-transform"
+                style={{
+                  backgroundColor: active ? `var(--color-${GAME_TONES[id]})` : 'var(--color-chalk)',
+                  transform: active ? 'rotate(-1.5deg) scale(1.03)' : `rotate(${i % 2 ? 1 : -1}deg)`,
+                }}
+              >
+                <span className="block text-xl font-extrabold uppercase">{g.name}</span>
+                <span className="mt-1 block text-sm leading-tight font-semibold opacity-65">{g.tagline}</span>
+              </button>
+            )
+          })}
+        </div>
 
+        {pick === 'hearsay' && (
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-xs font-bold tracking-widest uppercase opacity-50">how mean</span>
+            {(['mild', 'spicy'] as const).map((option) => (
+              <Button
+                key={option}
+                size="sm"
+                tone={option === 'spicy' ? 'red' : 'chalk'}
+                selected={tone === option}
+                onClick={() => {
+                  setTone(option)
+                  setHearsayTone(option)
+                }}
+              >
+                {option}
+              </Button>
+            ))}
+          </div>
+        )}
+
+        {pick === 'whosaidit' && <WhoSaidItLobbySetup players={players} />}
       </div>
 
-      <div className="flex items-center justify-center gap-4">
+      <div className="relative flex items-center justify-center gap-4">
         <button
           onClick={newRoom}
-          className="rounded-xl border-2 border-white/20 px-6 py-4 text-base font-black uppercase tracking-widest text-white/40 transition hover:border-white/40 hover:text-white/70"
+          className="font-mono text-xs font-bold tracking-widest uppercase underline decoration-2 underline-offset-4 opacity-45 transition-opacity hover:opacity-90"
         >
           New room
         </button>
-        <div className="flex flex-col items-center gap-2">
-          <button
-            disabled={!canStart}
-            onClick={() => runtime.current?.start(selected)}
-            className="rounded-2xl bg-white px-14 py-5 text-3xl font-black uppercase text-black disabled:opacity-20"
-          >
+        <div className="flex flex-col items-center gap-1.5">
+          <Button disabled={!canStart} onClick={() => runtime.current?.start(selected)} size="lg" tone="pink">
             Start {selected.name}
-          </button>
+          </Button>
           {!canStart && (
-            <p className="max-w-xl text-center text-sm font-bold text-amber-400">{blockedReason}</p>
+            <p className="max-w-md text-center font-mono text-xs font-bold lowercase opacity-60">{blockedReason}</p>
           )}
         </div>
       </div>
