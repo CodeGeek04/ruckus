@@ -166,10 +166,21 @@ describe('whoSaidItPlayerView', () => {
     expect(whoSaidItPlayerView(state, 'sam').wasCorrect).toBeNull()
   })
 
-  it('leaves the viewer off their own list of candidates', () => {
+  it('keeps the viewer on their own list, so they can pick themselves', () => {
+    // People forget what they typed. Voting for yourself has to be possible.
     const state = withAuthor('kushagra', null)
-    expect(whoSaidItPlayerView(state, 'mike').candidates).toEqual(['shivam', 'aman', 'kushagra'])
-    expect(whoSaidItPlayerView(state, 'ron').candidates).toEqual(['shivam', 'riya', 'kushagra'])
+    expect(whoSaidItPlayerView(state, 'mike').candidates).toEqual([
+      'shivam',
+      'riya',
+      'aman',
+      'kushagra',
+    ])
+    expect(whoSaidItPlayerView(state, 'ron').candidates).toEqual([
+      'shivam',
+      'riya',
+      'aman',
+      'kushagra',
+    ])
   })
 
   it('keeps every author on the list of a player nobody was linked to', () => {

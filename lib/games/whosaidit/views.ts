@@ -108,7 +108,11 @@ export function whoSaidItPlayerView(state: WhoSaidItState, playerId: PlayerId): 
     isAuthor,
     // Your own name comes off your list: you know you did not write it. Every
     // other author stays, including the ones who are not in the room.
-    candidates: round ? round.candidates.filter((a) => state.links[a] !== playerId) : [],
+    // Everyone gets the whole board, including their own name. People
+    // genuinely forget they said something, and being able to pick yourself is
+    // half the joke. The person who actually wrote this round never reaches
+    // this screen anyway: they are shown that they wrote it.
+    candidates: round ? round.candidates : [],
     myGuess: round ? round.guesses[playerId] ?? null : null,
     authorName: show && round ? round.author : null,
     wasCorrect: show && round && !isAuthor ? round.guesses[playerId] === round.author : null,
