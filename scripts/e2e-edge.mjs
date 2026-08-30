@@ -190,10 +190,17 @@ const lobbyRoster = hostRoster
 async function pickAndStart(host, gameLabel) {
   const tile = host.locator(`button:has-text("${gameLabel}")`).first()
   if (await tile.count()) await tile.click()
-  await sleep(400)
+  await sleep(600)
   const start = host.locator('button', { hasText: /^Start/ }).first()
+  // The roster arrives over the network, so give the button a moment to catch
+  // up rather than reporting a race as a bug.
+  for (let i = 0; i < 20 && (await start.count()) && (await start.isDisabled()); i++) await sleep(500)
   if (!(await start.count()) || (await start.isDisabled())) {
-    fail(`cannot start ${gameLabel}: ${(await start.textContent().catch(() => 'missing'))?.trim()}`)
+    const why = await host
+      .evaluate(() => document.body.innerText.split('\n').filter(Boolean).join(' | ').slice(0, 300))
+      .catch(() => '')
+    fail(`cannot start ${gameLabel}: button reads "${(await start.textContent().catch(() => 'missing'))?.trim()}", screen says "${why}"`)
+    await shot(host, 'cannot-start')
     return false
   }
   await start.click()
