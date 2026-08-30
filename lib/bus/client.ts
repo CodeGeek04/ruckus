@@ -98,11 +98,25 @@ export function createBus(): Bus {
     },
 
     async publish(channel, data) {
-      await fetch(`https://${HTTP}/event`, {
+      // AppSync answers 200 even when it rejects the event: the rejection is in
+      // a failed[] array in the body. Without this check an oversized payload
+      // vanishes with no error on either side, which is close to undebuggable.
+      // The 240KB event limit is real and reachable, so surface it loudly.
+      const res = await fetch(`https://${HTTP}/event`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY },
         body: JSON.stringify({ channel, events: [JSON.stringify(data)] }),
       })
+
+      if (!res.ok) {
+        console.error(`[bus] publish to ${channel} failed: HTTP ${res.status}`)
+        return
+      }
+
+      const body = (await res.json().catch(() => null)) as { failed?: unknown[] } | null
+      if (body?.failed?.length) {
+        console.error(`[bus] publish to ${channel} rejected:`, JSON.stringify(body.failed).slice(0, 300))
+      }
     },
 
     close() {

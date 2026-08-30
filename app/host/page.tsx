@@ -4,7 +4,8 @@ import { QrCode } from '@/components/QrCode'
 import { Countdown } from '@/components/Countdown'
 import { PlayerChip } from '@/components/PlayerChip'
 import { setHearsayTone } from '@/lib/games/hearsay'
-import { GAMES } from '@/lib/games/registry'
+import { WhoSaidItLobbySetup, whoSaidItStatus } from '@/lib/games/whosaidit'
+import { GAMES, GAME_ORDER } from '@/lib/games/registry'
 import { newRoomCode } from '@/lib/ids'
 import {
   createHostRuntime,
@@ -85,23 +86,32 @@ function setRoom(next: string) {
 }
 
 /** The host drives pacing manually; timers are a backstop, not the conductor. */
-function advanceLabel(phase: string | null): string {
-  switch (phase) {
-    case 'charge':
-      return 'Start voting'
-    case 'testimony':
-      return 'Show evidence'
-    case 'evidence':
-      return 'Let them guess'
-    case 'guess':
-      return 'Reveal'
-    case 'verdict':
-      return 'Scores'
-    case 'scoreboard':
-      return 'Next round'
-    default:
-      return 'Next'
-  }
+const ADVANCE_LABELS: Record<string, Record<string, string>> = {
+  hearsay: {
+    charge: 'Start voting',
+    testimony: 'Show evidence',
+    evidence: 'Let them guess',
+    guess: 'Reveal',
+    verdict: 'Scores',
+    scoreboard: 'Next round',
+  },
+  whosaidit: {
+    message: 'Reveal',
+    reveal: 'Scores',
+    scoreboard: 'Next message',
+  },
+  telephone: {
+    write: 'Start drawing',
+    describe: 'Start drawing',
+    drawing: 'Skip wait',
+    reveal: 'Next',
+    vote: 'Results',
+  },
+}
+
+function advanceLabel(gameId: string | undefined, phase: string | null): string {
+  if (!gameId || !phase) return 'Next'
+  return ADVANCE_LABELS[gameId]?.[phase] ?? 'Next'
 }
 
 export default function HostPage() {
@@ -113,6 +123,7 @@ export default function HostPage() {
   const [view, setView] = useState<unknown>(null)
   const [deadline, setDeadline] = useState<number | null>(null)
   const [tone, setTone] = useState<'mild' | 'spicy'>('spicy')
+  const [pick, setPick] = useState<string>('hearsay')
   const runtime = useRef<HostRuntime | null>(null)
 
   useEffect(() => {
@@ -171,8 +182,14 @@ export default function HostPage() {
   }, [code, reset])
 
   const joinUrl = !code || typeof window === 'undefined' ? '' : `${window.location.origin}/play/${code}`
-  const hearsay = GAMES.hearsay
-  const canStart = players.length >= hearsay.minPlayers
+  const selected = GAMES[pick]
+
+  // Every game needs enough players. Who Said It additionally needs a chat
+  // export loaded and its authors mapped, and says so in its own words.
+  const enoughPlayers = players.length >= selected.minPlayers
+  const extra = pick === 'whosaidit' ? whoSaidItStatus(players) : { ready: true, reason: '' }
+  const canStart = enoughPlayers && extra.ready
+  const blockedReason = !enoughPlayers ? `Need ${selected.minPlayers} players` : extra.reason
 
   if (game && view) {
     const Screen = game.HostScreen
@@ -201,7 +218,7 @@ export default function HostPage() {
               onClick={() => runtime.current?.advance()}
               className="rounded-xl bg-white px-8 py-3 text-xl font-black uppercase tracking-widest text-black transition active:scale-95"
             >
-              {advanceLabel(viewPhase(view))}
+              {advanceLabel(game.id, viewPhase(view))}
             </button>
           )}
         </div>
@@ -230,29 +247,54 @@ export default function HostPage() {
         )}
       </div>
 
-      <div className="flex gap-3">
-        {(['mild', 'spicy'] as const).map((option) => (
-          <button
-            key={option}
-            onClick={() => {
-              setTone(option)
-              setHearsayTone(option)
-            }}
-            className={`rounded-xl border-4 px-8 py-3 text-xl font-black uppercase ${
-              tone === option ? 'border-white bg-white text-black' : 'border-white/30 text-white/50'
-            }`}
-          >
-            {option}
-          </button>
-        ))}
+      <div className="flex flex-wrap justify-center gap-4">
+        {GAME_ORDER.map((id) => {
+          const g = GAMES[id]
+          const active = pick === id
+          return (
+            <button
+              key={id}
+              onClick={() => setPick(id)}
+              className={`w-64 rounded-2xl border-4 px-6 py-4 text-left transition ${
+                active ? 'border-white bg-white text-black' : 'border-white/20 text-white/60 hover:border-white/40'
+              }`}
+            >
+              <span className="block text-2xl font-black uppercase">{g.name}</span>
+              <span className={`block text-sm font-bold ${active ? 'text-black/60' : 'text-white/40'}`}>
+                {g.tagline}
+              </span>
+            </button>
+          )
+        })}
       </div>
+
+      {pick === 'hearsay' && (
+        <div className="flex gap-3">
+          {(['mild', 'spicy'] as const).map((option) => (
+            <button
+              key={option}
+              onClick={() => {
+                setTone(option)
+                setHearsayTone(option)
+              }}
+              className={`rounded-xl border-4 px-8 py-3 text-xl font-black uppercase ${
+                tone === option ? 'border-white bg-white text-black' : 'border-white/30 text-white/50'
+              }`}
+            >
+              {option}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {pick === 'whosaidit' && <WhoSaidItLobbySetup players={players} />}
 
       <button
         disabled={!canStart}
-        onClick={() => runtime.current?.start(hearsay)}
+        onClick={() => runtime.current?.start(selected)}
         className="rounded-2xl bg-white px-16 py-6 text-4xl font-black uppercase text-black disabled:opacity-20"
       >
-        {canStart ? 'Start Hearsay' : `Need ${hearsay.minPlayers} players`}
+        {canStart ? `Start ${selected.name}` : blockedReason}
       </button>
 
       <button
