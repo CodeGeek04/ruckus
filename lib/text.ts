@@ -12,7 +12,6 @@ export const MAX_NAME_LENGTH = 12
  * stay: C0 and C1 controls, and the bidi overrides that let a name reorder the
  * text around it on the shared screen.
  */
-// eslint-disable-next-line no-control-regex
 const FORBIDDEN = /[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]/g
 
 /** A high or low surrogate with no partner. See `truncate` for how they appear. */

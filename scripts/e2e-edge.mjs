@@ -219,8 +219,6 @@ async function hostState(host, code) {
   return (await snapshot(host, code))?.state ?? null
 }
 
-const lobbyRoster = hostRoster
-
 async function pickAndStart(host, gameLabel) {
   const tile = host.locator(`button:has-text("${gameLabel}")`).first()
   if (await tile.count()) await tile.click()
