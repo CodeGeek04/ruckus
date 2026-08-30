@@ -38,7 +38,7 @@ export type TelephoneInput =
    * that submitted it, after its call to /api/image returns. A null url means
    * the model failed or refused, and the reducer substitutes a placeholder.
    */
-  | { kind: 'image'; url: string | null }
+  | { kind: 'image'; url: string | null; key: string }
   | { kind: 'vote'; chainIndex: number }
 
 export type TelephoneConfig = {

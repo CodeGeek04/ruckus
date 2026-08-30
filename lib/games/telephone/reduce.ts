@@ -186,6 +186,17 @@ function cleanText(text: unknown, config: TelephoneConfig): string {
  * plain https url from our own storage becomes a placeholder, so a phone with
  * devtools open cannot put an arbitrary image on the shared screen.
  */
+/** "chainIndex:stepIndex", the key the phone was handed in its view. */
+function parseSlot(key: unknown): { chainIndex: number; stepIndex: number } | null {
+  if (typeof key !== 'string') return null
+  const [chain, step] = key.split(':')
+  const chainIndex = Number(chain)
+  const stepIndex = Number(step)
+  if (!Number.isInteger(chainIndex) || !Number.isInteger(stepIndex)) return null
+  if (chainIndex < 0 || stepIndex < 0) return null
+  return { chainIndex, stepIndex }
+}
+
 function cleanUrl(url: unknown): string | null {
   if (typeof url !== 'string') return null
   if (url.length > 512) return null
@@ -226,13 +237,22 @@ function applyInput(state: TelephoneState, playerId: PlayerId, input: TelephoneI
   }
 
   if (input.kind === 'image') {
-    const entry = chain.entries[state.stepIndex]
+    // The image is addressed to the slot it was requested for, not to whatever
+    // step happens to be current when it lands. Generation takes seconds, and
+    // the step can move on in the meantime (a slow phone, or the host skipping
+    // the wait). Keying on state.stepIndex dropped those images silently and
+    // left the chain showing "no picture" forever.
+    const slot = parseSlot(input.key)
+    if (!slot) return { state }
+
+    const target = state.chains[slot.chainIndex]
+    const entry = target?.entries[slot.stepIndex]
     if (!entry || entry.playerId !== playerId || entry.imageUrl != null) return { state }
 
     const url = cleanUrl(input.url)
-    const entries = [...chain.entries]
-    entries[state.stepIndex] = { ...entry, imageUrl: url ?? PLACEHOLDER_IMAGE, failed: url === null }
-    return settle(withChain(state, chainIndex, { ...chain, entries }))
+    const entries = [...target.entries]
+    entries[slot.stepIndex] = { ...entry, imageUrl: url ?? PLACEHOLDER_IMAGE, failed: url === null }
+    return settle(withChain(state, slot.chainIndex, { ...target, entries }))
   }
 
   return { state }

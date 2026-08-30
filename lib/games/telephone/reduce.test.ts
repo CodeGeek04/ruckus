@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Player } from '@/lib/types'
+import { chainForPlayer } from './chains'
 import { initTelephone, reduceTelephone } from './reduce'
 import { DEFAULT_CONFIG, PLACEHOLDER_IMAGE, type TelephoneState } from './state'
 
@@ -20,9 +21,19 @@ function submitAll(state: TelephoneState, prefix = 'a'): TelephoneState {
   )
 }
 
+/** The slot a player is working on this step, as the view hands it to them. */
+function slotFor(state: TelephoneState, playerIndex: number): string {
+  return `${chainForPlayer(playerIndex, state.stepIndex, ids.length)}:${state.stepIndex}`
+}
+
 function drawAll(state: TelephoneState): TelephoneState {
   return ids.reduce(
-    (acc, id, i) => reduceTelephone(acc, { type: 'input', playerId: id, payload: { kind: 'image', url: url(i) } }).state,
+    (acc, id, i) =>
+      reduceTelephone(acc, {
+        type: 'input',
+        playerId: id,
+        payload: { kind: 'image', url: url(i), key: slotFor(acc, i) },
+      }).state,
     state
   )
 }
@@ -122,14 +133,14 @@ describe('writing a sentence', () => {
 describe('pictures coming back', () => {
   it('records the url against the sentence that produced it', () => {
     let state = submitAll(initTelephone(players))
-    state = reduceTelephone(state, { type: 'input', playerId: 'sam', payload: { kind: 'image', url: url(0) } }).state
+    state = reduceTelephone(state, { type: 'input', playerId: 'sam', payload: { kind: 'image', url: url(0), key: slotFor(state, 0) } }).state
     expect(state.chains[0].entries[0].imageUrl).toBe(url(0))
     expect(state.chains[0].entries[0].failed).toBe(false)
   })
 
   it('substitutes a placeholder when the model failed', () => {
     let state = submitAll(initTelephone(players))
-    state = reduceTelephone(state, { type: 'input', playerId: 'sam', payload: { kind: 'image', url: null } }).state
+    state = reduceTelephone(state, { type: 'input', playerId: 'sam', payload: { kind: 'image', url: null, key: slotFor(state, 0) } }).state
     expect(state.chains[0].entries[0].imageUrl).toBe(PLACEHOLDER_IMAGE)
     expect(state.chains[0].entries[0].failed).toBe(true)
   })
@@ -139,7 +150,7 @@ describe('pictures coming back', () => {
     state = reduceTelephone(state, {
       type: 'input',
       playerId: 'sam',
-      payload: { kind: 'image', url: 'https://evil.example.com/nsfw.jpg' },
+      payload: { kind: 'image', url: 'https://evil.example.com/nsfw.jpg', key: slotFor(state, 0) },
     }).state
     expect(state.chains[0].entries[0].imageUrl).toBe(PLACEHOLDER_IMAGE)
     expect(state.chains[0].entries[0].failed).toBe(true)
@@ -147,9 +158,39 @@ describe('pictures coming back', () => {
 
   it('ignores a second picture for the same sentence', () => {
     let state = submitAll(initTelephone(players))
-    state = reduceTelephone(state, { type: 'input', playerId: 'sam', payload: { kind: 'image', url: url(0) } }).state
-    state = reduceTelephone(state, { type: 'input', playerId: 'sam', payload: { kind: 'image', url: url(9) } }).state
+    state = reduceTelephone(state, { type: 'input', playerId: 'sam', payload: { kind: 'image', url: url(0), key: slotFor(state, 0) } }).state
+    state = reduceTelephone(state, { type: 'input', playerId: 'sam', payload: { kind: 'image', url: url(9), key: slotFor(state, 0) } }).state
     expect(state.chains[0].entries[0].imageUrl).toBe(url(0))
+  })
+
+  it('still lands a picture that arrives after the step moved on', () => {
+    // Generation takes seconds. A slow phone, or a host who skips the wait,
+    // used to have its image dropped in silence and the chain showed
+    // "no picture" for the rest of the game.
+    let state = submitAll(initTelephone(players))
+    const slot = slotFor(state, 0)
+    const chainIndex = chainForPlayer(0, state.stepIndex, ids.length)
+
+    // Everyone else finishes and the step advances past sam.
+    state = ids.slice(1).reduce(
+      (acc, id, i) =>
+        reduceTelephone(acc, {
+          type: 'input',
+          playerId: id,
+          payload: { kind: 'image', url: url(i + 1), key: slotFor(acc, i + 1) },
+        }).state,
+      state
+    )
+
+    // Sam's picture finally arrives, addressed to the slot it was made for.
+    state = reduceTelephone(state, {
+      type: 'input',
+      playerId: 'sam',
+      payload: { kind: 'image', url: url(0), key: slot },
+    }).state
+
+    expect(state.chains[chainIndex].entries[0].imageUrl).toBe(url(0))
+    expect(state.chains[chainIndex].entries[0].failed).toBe(false)
   })
 
   it('starts the next step once every picture is back', () => {
@@ -164,7 +205,7 @@ describe('pictures coming back', () => {
       playerId: 'sam',
       payload: { kind: 'submit', text: 'early' },
     }).state
-    state = reduceTelephone(state, { type: 'input', playerId: 'sam', payload: { kind: 'image', url: url(0) } }).state
+    state = reduceTelephone(state, { type: 'input', playerId: 'sam', payload: { kind: 'image', url: url(0), key: slotFor(state, 0) } }).state
     expect(state.phase).toBe('write')
     expect(state.chains[0].entries[0].imageUrl).toBe(url(0))
   })
@@ -200,7 +241,7 @@ describe('nobody is allowed to hold up the room', () => {
 
   it('fills a missing picture on the deadline rather than hanging', () => {
     let state = submitAll(initTelephone(players))
-    state = reduceTelephone(state, { type: 'input', playerId: 'sam', payload: { kind: 'image', url: url(0) } }).state
+    state = reduceTelephone(state, { type: 'input', playerId: 'sam', payload: { kind: 'image', url: url(0), key: slotFor(state, 0) } }).state
     expect(state.phase).toBe('drawing')
 
     state = reduceTelephone(state, { type: 'deadline' }).state

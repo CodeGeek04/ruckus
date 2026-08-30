@@ -39,7 +39,7 @@ function useImageGeneration(view: TelephonePlayerView, send: (input: TelephoneIn
 
     const deliver = (url: string | null) => {
       result.current = { key: pendingKey, url }
-      sendRef.current({ kind: 'image', url })
+      sendRef.current({ kind: 'image', url, key: pendingKey })
     }
 
     fetch('/api/image', {
@@ -58,7 +58,9 @@ function useImageGeneration(view: TelephonePlayerView, send: (input: TelephoneIn
   useEffect(() => {
     if (!pendingKey) return
     const id = setInterval(() => {
-      if (result.current?.key === pendingKey) sendRef.current({ kind: 'image', url: result.current.url })
+      if (result.current?.key === pendingKey) {
+        sendRef.current({ kind: 'image', url: result.current.url, key: pendingKey })
+      }
     }, RESEND_MS)
     return () => clearInterval(id)
   }, [pendingKey])

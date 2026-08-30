@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Player } from '@/lib/types'
+import { chainForPlayer } from './chains'
 import { initTelephone, reduceTelephone } from './reduce'
 import type { TelephoneState } from './state'
 import { telephoneHostView, telephonePlayerView } from './views'
@@ -20,7 +21,17 @@ function runStep(state: TelephoneState, prefix: string): TelephoneState {
     state
   )
   next = ids.reduce(
-    (acc, id, i) => reduceTelephone(acc, { type: 'input', playerId: id, payload: { kind: 'image', url: url(i) } }).state,
+    (acc, id, i) =>
+      reduceTelephone(acc, {
+        type: 'input',
+        playerId: id,
+        // Addressed to the slot the player was given, so a late picture still lands.
+        payload: {
+          kind: 'image',
+          url: url(i),
+          key: `${chainForPlayer(i, acc.stepIndex, ids.length)}:${acc.stepIndex}`,
+        },
+      }).state,
     next
   )
   return next
@@ -40,14 +51,14 @@ describe('telephoneHostView', () => {
     state = reduceTelephone(state, { type: 'input', playerId: 'sam', payload: { kind: 'submit', text: 'a' } }).state
     expect(telephoneHostView(state)).toMatchObject({ submitted: 1, drawn: 0 })
 
-    state = reduceTelephone(state, { type: 'input', playerId: 'sam', payload: { kind: 'image', url: url(0) } }).state
+    state = reduceTelephone(state, { type: 'input', playerId: 'sam', payload: { kind: 'image', url: url(0), key: '0:0' } }).state
     expect(telephoneHostView(state)).toMatchObject({ submitted: 1, drawn: 1 })
   })
 
   it('names who the room is still waiting on', () => {
     let state = initTelephone(players)
     state = reduceTelephone(state, { type: 'input', playerId: 'sam', payload: { kind: 'submit', text: 'a' } }).state
-    state = reduceTelephone(state, { type: 'input', playerId: 'sam', payload: { kind: 'image', url: url(0) } }).state
+    state = reduceTelephone(state, { type: 'input', playerId: 'sam', payload: { kind: 'image', url: url(0), key: '0:0' } }).state
     expect(telephoneHostView(state).waitingOn).toEqual(['Mike', 'Ron', 'Emily'])
   })
 
@@ -125,7 +136,7 @@ describe('telephonePlayerView', () => {
       playerId: 'sam',
       payload: { kind: 'submit', text: 'a goose in court' },
     }).state
-    state = reduceTelephone(state, { type: 'input', playerId: 'sam', payload: { kind: 'image', url: url(0) } }).state
+    state = reduceTelephone(state, { type: 'input', playerId: 'sam', payload: { kind: 'image', url: url(0), key: '0:0' } }).state
     const view = telephonePlayerView(state, 'sam')
     expect(view.pendingPrompt).toBeNull()
     expect(view.pendingKey).toBeNull()
@@ -189,7 +200,11 @@ describe('what actually goes on the wire', () => {
             type: 'input',
             playerId: id,
             // A real blob url, at its real length.
-            payload: { kind: 'image', url: `https://9jjtbrppmjidkfkr.public.blob.vercel-storage.com/telephone/1788074013193-xROl2V55dOef02J6rghl${i}.jpg` },
+            payload: {
+              kind: 'image',
+              url: `https://9jjtbrppmjidkfkr.public.blob.vercel-storage.com/telephone/1788074013193-xROl2V55dOef02J6rghl${i}.jpg`,
+              key: `${chainForPlayer(i, acc.stepIndex, everyone.length)}:${acc.stepIndex}`,
+            },
           }).state,
         state
       )

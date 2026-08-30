@@ -158,7 +158,8 @@ async function main() {
   console.log('--- playing ---')
 
   let lastPhase = null
-  for (let step = 0; step < 40; step++) {
+  const budget = GAME === 'telephone' ? 120 : 40
+  for (let step = 0; step < budget; step++) {
     await sleep(1200)
 
     const phase = await host.evaluate(() => document.body.innerText.slice(0, 400))
@@ -173,21 +174,37 @@ async function main() {
 
     // Every phone taps its first available action.
     for (const { name, page } of phones) {
-      const box = page.locator('textarea, input[type=text]').first()
+      // Scope to the app: Next's dev overlay renders buttons in a portal and a
+      // blind random click lands on it instead of the game.
+      // input[type=text] does not match an <input> with no type attribute,
+      // which is what the phone screens actually render.
+      const box = page.locator('main textarea, main input:not([type=file])').first()
       if (await box.count()) {
         await box.fill(`${name} says something ridiculous ${step}`).catch(() => {})
       }
-      const buttons = page.locator('button:not([disabled])')
-      const n = await buttons.count()
-      if (n > 0) {
-        await buttons.nth(Math.floor(Math.random() * n)).click().catch(() => {})
-        await checkLayout(page, `phone ${name} step ${step}`)
+
+      // Prefer an obvious submit, otherwise tap any answer.
+      const submit = page
+        .locator('main button:not([disabled])', { hasText: /send|submit|lock|done|go/i })
+        .first()
+      if (await submit.count()) {
+        await submit.click().catch(() => {})
+      } else {
+        const buttons = page.locator('main button:not([disabled])')
+        const n = await buttons.count()
+        if (n > 0) await buttons.nth(Math.floor(Math.random() * n)).click().catch(() => {})
       }
+      await checkLayout(page, `phone ${name} step ${step}`)
     }
 
-    // Host drives the pace, exactly as a human would.
-    const advance = host.locator('button', { hasText: /Start voting|Show evidence|Let them guess|Reveal|Scores|Next/ }).first()
-    if (await advance.count()) await advance.click().catch(() => {})
+    // Host drives the pace, exactly as a human would, but never skips the wait
+    // for image generation: that is a real phase, not dead time.
+    if (!/generating|drawing|making/i.test(phase)) {
+      const advance = host
+        .locator('button', { hasText: /Start voting|Show evidence|Let them guess|Reveal|Scores|Next/ })
+        .first()
+      if (await advance.count()) await advance.click().catch(() => {})
+    }
 
     if (/final|winner|standings/i.test(phase)) {
       note('reached the end')
