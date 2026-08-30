@@ -182,10 +182,13 @@ export default function HostPage() {
   }, [code, reset])
 
   const joinUrl = !code || typeof window === 'undefined' ? '' : `${window.location.origin}/play/${code}`
+  // The room needs to know where to type the code, not a brand name.
+  const hostName = typeof window === 'undefined' ? '' : window.location.host
   const selected = GAMES[pick]
 
   // Every game needs enough players. Who Said It additionally needs a chat
-  // export loaded and its authors mapped, and says so in its own words.
+  // export loaded with enough authors on the answer board, and says so in its
+  // own words.
   const enoughPlayers = players.length >= selected.minPlayers
   const extra = pick === 'whosaidit' ? whoSaidItStatus(players) : { ready: true, reason: '' }
   const canStart = enoughPlayers && extra.ready
@@ -227,23 +230,29 @@ export default function HostPage() {
   }
 
   return (
-    <main className="flex h-full flex-col items-center justify-center gap-10 p-10">
-      <h1 className="text-5xl font-black uppercase tracking-widest text-white/50">Ruckus</h1>
+    <main className="grid h-full grid-rows-[auto_minmax(0,1fr)_auto] gap-4 overflow-hidden p-6">
+      <h1 className="text-center text-3xl font-black uppercase tracking-[0.3em] text-white/40">Ruckus</h1>
+
+      <div className="flex min-h-0 flex-col items-center justify-center gap-5 overflow-hidden">
 
       <div className="flex items-center gap-12">
         <div className="text-center">
-          <p className="text-2xl font-bold uppercase tracking-widest text-white/50">Go to ruckus and enter</p>
-          <p className="font-mono text-[10rem] font-black leading-none tracking-widest">{code ?? '----'}</p>
+          <p className="text-xl font-bold uppercase tracking-widest text-white/50">
+            Go to <span className="text-white">{hostName}</span> and enter
+          </p>
+          <p className="font-mono text-[clamp(4rem,11vw,9rem)] font-black leading-none tracking-widest">
+            {code ?? '----'}
+          </p>
         </div>
-        {joinUrl && <QrCode value={joinUrl} size={240} />}
+        {joinUrl && <QrCode value={joinUrl} size={180} />}
       </div>
 
-      <div className="flex min-h-32 flex-wrap items-center justify-center gap-6">
+      <div className="flex flex-wrap items-center justify-center gap-5">
         {players.map((player) => (
           <PlayerChip key={player.id} player={player} size="lg" />
         ))}
         {players.length === 0 && (
-          <p className="text-3xl font-bold text-white/30">Waiting for players...</p>
+          <p className="text-2xl font-bold text-white/30">Waiting for players...</p>
         )}
       </div>
 
@@ -289,20 +298,23 @@ export default function HostPage() {
 
       {pick === 'whosaidit' && <WhoSaidItLobbySetup players={players} />}
 
-      <button
-        disabled={!canStart}
-        onClick={() => runtime.current?.start(selected)}
-        className="rounded-2xl bg-white px-16 py-6 text-4xl font-black uppercase text-black disabled:opacity-20"
-      >
-        {canStart ? `Start ${selected.name}` : blockedReason}
-      </button>
+      </div>
 
-      <button
-        onClick={newRoom}
-        className="rounded-xl border-4 border-white/30 px-8 py-3 text-xl font-black uppercase tracking-widest text-white/60"
-      >
-        New room
-      </button>
+      <div className="flex items-center justify-center gap-4">
+        <button
+          onClick={newRoom}
+          className="rounded-xl border-2 border-white/20 px-6 py-4 text-base font-black uppercase tracking-widest text-white/40 transition hover:border-white/40 hover:text-white/70"
+        >
+          New room
+        </button>
+        <button
+          disabled={!canStart}
+          onClick={() => runtime.current?.start(selected)}
+          className="rounded-2xl bg-white px-14 py-5 text-3xl font-black uppercase text-black disabled:opacity-20"
+        >
+          {canStart ? `Start ${selected.name}` : blockedReason}
+        </button>
+      </div>
     </main>
   )
 }

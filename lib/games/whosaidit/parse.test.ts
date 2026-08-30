@@ -204,7 +204,7 @@ describe('authorStats', () => {
     expect(shivam.usable).toBe(1)
   })
 
-  it('sorts the loudest author first, so the mapping UI leads with the people who matter', () => {
+  it('sorts the loudest author first, so the lobby list leads with the people who matter', () => {
     const stats = authorStats(parseWhatsAppExport(BRACKET_EXPORT))
     for (let i = 1; i < stats.length; i++) {
       expect(stats[i - 1].total).toBeGreaterThanOrEqual(stats[i].total)

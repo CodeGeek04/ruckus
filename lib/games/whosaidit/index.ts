@@ -11,7 +11,7 @@ import {
   type WhoSaidItPlayerView,
 } from './views'
 
-/** The host lobby renders this to import the chat and map its authors. */
+/** The host lobby renders this to import the chat and pick its authors. */
 export { WhoSaidItLobbySetup } from './LobbySetup'
 export { clearWhoSaidItSource, setWhoSaidItSource, whoSaidItStatus } from './source'
 

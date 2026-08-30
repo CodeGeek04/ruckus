@@ -199,7 +199,7 @@ function cleanBody(raw: string): string | null {
 /**
  * Parses both common WhatsApp export shapes. Anything that is not a message a
  * human typed is dropped here; judging whether a real message is worth showing
- * is a separate pass, because the mapping UI needs the raw counts too.
+ * is a separate pass, because the lobby author list needs the raw counts too.
  */
 export function parseWhatsAppExport(raw: string): ChatMessage[] {
   const messages: ChatMessage[] = []
@@ -239,7 +239,7 @@ export function parseWhatsAppExport(raw: string): ChatMessage[] {
   return messages
 }
 
-/** Per author counts for the lobby mapping screen, loudest first. */
+/** Per author counts for the lobby author list, loudest first. */
 export function authorStats(messages: readonly ChatMessage[]): AuthorStat[] {
   const authors = [...new Set(messages.map((m) => m.author))]
   const stats = authors.map((author) => {
@@ -264,13 +264,13 @@ function shuffled<T>(items: readonly T[]): T[] {
 }
 
 export type ChooseOptions = {
-  /** Chat authors that are mapped to a player in the lobby. */
+  /** The chat authors the host left included. They are the answer board. */
   authors: readonly string[]
   count: number
 }
 
 /**
- * Picks the rounds. Only mapped authors are eligible, only quality messages
+ * Picks the rounds. Only included authors are eligible, only quality messages
  * survive, and the picks are dealt round robin so the loudest person in the
  * chat does not become the answer to every round.
  */
