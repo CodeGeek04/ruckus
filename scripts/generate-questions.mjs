@@ -10,7 +10,7 @@
 //
 // Output is ready to paste into lib/games/hearsay/questions.ts. READ EVERY LINE
 // BEFORE PASTING. The bank is the game, and a cruel question ruins a night.
-import { readFileSync } from 'node:fs'
+import { readEnvLocal } from './env-local.mjs'
 
 const FAMILIES = ['conflict', 'affection', 'chaos', 'trust', 'secrets']
 
@@ -18,17 +18,7 @@ const FAMILIES = ['conflict', 'affection', 'chaos', 'trust', 'secrets']
 // letter collides and produces duplicate ids across batches.
 const ID_PREFIX = { conflict: 'cf', affection: 'af', chaos: 'ch', trust: 'tr', secrets: 'se' }
 
-const env = Object.fromEntries(
-  readFileSync(new URL('../.env.local', import.meta.url), 'utf8')
-    .split('\n')
-    .filter((line) => line.includes('='))
-    .map((line) => {
-      const at = line.indexOf('=')
-      // Values may be quoted in .env.local; strip a matching pair.
-      const value = line.slice(at + 1).trim().replace(/^(['"])(.*)\1$/, '$2')
-      return [line.slice(0, at).trim(), value]
-    })
-)
+const env = readEnvLocal()
 
 const API_KEY = env.ANTHROPIC_KEY
 if (!API_KEY) {

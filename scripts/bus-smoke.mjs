@@ -1,13 +1,8 @@
 // scripts/bus-smoke.mjs
 // Run against the real AppSync Events API. Node 22+ has WebSocket and fetch built in.
-import { readFileSync } from 'node:fs'
+import { readEnvLocal } from './env-local.mjs'
 
-const env = Object.fromEntries(
-  readFileSync('.env.local', 'utf8')
-    .split('\n')
-    .filter((line) => line.includes('='))
-    .map((line) => line.split('=').map((part) => part.trim()))
-)
+const env = readEnvLocal()
 
 const HTTP = env.NEXT_PUBLIC_EVENTS_HTTP
 const RT = env.NEXT_PUBLIC_EVENTS_REALTIME

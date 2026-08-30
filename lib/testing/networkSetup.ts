@@ -8,7 +8,12 @@ for (const line of readFileSync('.env.local', 'utf8').split('\n')) {
   if (at < 0) continue
   const key = line.slice(0, at).trim()
   if (!key || key.startsWith('#')) continue
-  process.env[key] ??= line.slice(at + 1).trim()
+  // Strip surrounding quotes: vercel link rewrites .env.local with quoted
+  // values, and a hostname containing a literal quote fails silently.
+  process.env[key] ??= line
+    .slice(at + 1)
+    .trim()
+    .replace(/^(['"])(.*)\1$/, '$2')
 }
 
 /**
