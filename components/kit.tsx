@@ -107,17 +107,26 @@ export function Button({
   className?: string
 }) {
   const pad = { sm: 'px-5 py-3 text-base', md: 'px-7 py-4 text-xl', lg: 'px-10 py-5 text-3xl' }[size]
+
+  // Selection is shown by an inset ring and a lift, never by swapping the fill
+  // to ink: a black chip in a row of coloured ones reads as switched off.
   const background =
-    selected ? 'var(--color-ink)' : tone === 'chalk' ? 'var(--color-chalk)' : tone === 'ink' ? 'var(--color-ink)' : HUES[tone]
+    tone === 'chalk' ? 'var(--color-chalk)' : tone === 'ink' ? 'var(--color-ink)' : HUES[tone]
 
   return (
     <button
       onClick={onClick}
       disabled={disabled}
-      className={`slab press ${pad} font-extrabold uppercase tracking-tight disabled:opacity-40 ${className}`}
+      aria-pressed={selected || undefined}
+      className={`slab press ${pad} font-extrabold uppercase tracking-tight transition-[opacity,transform] ${
+        selected ? 'scale-105 ring-4 ring-[var(--color-ink)] ring-inset' : ''
+      } ${className}`}
       style={{
-        backgroundColor: background,
-        color: selected || tone === 'ink' ? 'var(--color-paper)' : 'var(--color-ink)',
+        // Disabled falls back to chalk: a washed-out saturated fill on a
+        // saturated field turns muddy.
+        backgroundColor: disabled ? 'var(--color-chalk)' : background,
+        color: tone === 'ink' && !disabled ? 'var(--color-paper)' : 'var(--color-ink)',
+        opacity: disabled ? 0.55 : selected ? 1 : 0.92,
       }}
     >
       {children}

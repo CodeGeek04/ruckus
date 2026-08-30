@@ -135,14 +135,11 @@ async function openHost(browser, { width = 1440, height = 900 } = {}) {
   const page = await ctx.newPage()
   watch(page, 'host')
   await page.goto(`${BASE}/host`, { waitUntil: 'networkidle' })
-  await page.waitForFunction(
-    () => {
-      const el = document.querySelector('p.font-mono')
-      return el && el.textContent.trim().length === 4 && el.textContent.trim() !== '----'
-    },
-    { timeout: 20000 }
-  )
-  const code = (await page.locator('p.font-mono').first().textContent()).trim()
+  // The room code comes from the host's own localStorage rather than the
+  // screen, so a restyle cannot break every scenario at once.
+  await page.waitForFunction(() => !!localStorage.getItem('ruckus:host:last'), { timeout: 20000 })
+  const code = await page.evaluate(() => localStorage.getItem('ruckus:host:last'))
+  if (!code || code.length !== 4) fail(`host produced a bad room code "${code}"`)
   return { ctx, page, code }
 }
 
@@ -164,14 +161,31 @@ async function joinPhone(browser, code, name, device = 'iPhone 13') {
   return { ctx, page, name, joined }
 }
 
-/** Names shown in the host scoreboard footer, one per player. */
-async function hostRoster(host) {
-  return host.locator('footer span.text-xs').allTextContents()
+/**
+ * The host writes its whole room to localStorage on every push, so that is
+ * where this harness reads game state from. Scraping the screen would tie
+ * every assertion to the current markup, and the point of these tests is the
+ * behaviour underneath it.
+ */
+async function snapshot(host, code) {
+  return host
+    .evaluate((c) => {
+      const raw = localStorage.getItem(`ruckus:host:${c}`)
+      return raw ? JSON.parse(raw) : null
+    }, code)
+    .catch(() => null)
 }
 
-async function lobbyRoster(host) {
-  return host.locator('main span.text-xs').allTextContents()
+async function hostRoster(host, code) {
+  const snap = await snapshot(host, code)
+  return (snap?.players ?? []).map((p) => p.name)
 }
+
+async function hostState(host, code) {
+  return (await snapshot(host, code))?.state ?? null
+}
+
+const lobbyRoster = hostRoster
 
 async function pickAndStart(host, gameLabel) {
   const tile = host.locator(`button:has-text("${gameLabel}")`).first()
@@ -223,9 +237,11 @@ async function rejoinAfterClose(browser) {
 
   for (let i = 0; i < 6; i++) await hearsayStep(host, phones)
 
-  const before = await hostRoster(host)
+  const before = await hostRoster(host, code)
   const target = phones[1]
-  const scoreBefore = (await hostText(host)).length
+  const stateBefore = await hostState(host, code)
+  const idBefore = (await snapshot(host, code)).players[1].id
+  const scoresBefore = stateBefore?.scores ?? {}
 
   // Close the tab the way a phone does: gone, no goodbye.
   await target.page.close()
@@ -245,14 +261,22 @@ async function rejoinAfterClose(browser) {
   target.page = back
 
   await sleep(2000)
-  const after = await hostRoster(host)
+  const snapAfter = await snapshot(host, code)
+  const after = (snapAfter?.players ?? []).map((p) => p.name)
   if (after.length !== before.length) {
     fail(`reopening a phone changed the roster: ${before.length} players became ${after.length}`)
   }
-  if (after.filter((n) => n === before[0]).length > 1 || new Set(after).size !== after.length) {
+  if (new Set(after).size !== after.length) {
     fail(`roster has duplicates after a reopen: ${after.join(', ')}`)
   }
-  if (scoreBefore === 0) fail('host screen was empty before the reopen')
+  if (!snapAfter?.players.some((p) => p.id === idBefore)) {
+    fail(`${target.name} came back as a new player: id ${idBefore} is gone from the roster`)
+  }
+  const scoreWas = scoresBefore[idBefore]
+  const scoreNow = snapAfter?.state?.scores?.[idBefore]
+  if (scoreNow !== scoreWas) {
+    fail(`${target.name} lost their score across a reopen: ${scoreWas} became ${scoreNow}`)
+  }
 
   // The reopened phone must be playable again, not a spectator.
   await hearsayStep(host, phones)
@@ -274,23 +298,30 @@ async function hostRefresh(browser) {
 
   for (let i = 0; i < 8; i++) await hearsayStep(host, phones)
 
-  const roundBefore = (await hostText(host)).match(/Round (\d+) of (\d+)/)?.[0] ?? null
-  const rosterBefore = await hostRoster(host)
-  if (!roundBefore) fail('host was not showing a round before the refresh')
+  const stateBefore = await hostState(host, code)
+  const roundBefore = stateBefore?.roundIndex ?? null
+  const rosterBefore = await hostRoster(host, code)
+  if (roundBefore === null) fail('host had no round in its snapshot before the refresh')
 
   await host.reload({ waitUntil: 'networkidle' })
   await sleep(4000)
   await shot(host, 'after-reload')
 
+  const stateAfter = await hostState(host, code)
   const textAfter = await hostText(host)
-  const roundAfter = textAfter.match(/Round (\d+) of (\d+)/)?.[0] ?? null
-  if (!roundAfter) {
-    fail(`host refresh lost the round, screen now reads "${textAfter.split('\n').filter(Boolean).slice(0, 3).join(' | ')}"`)
-  } else if (roundAfter !== roundBefore) {
-    fail(`host refresh restored the wrong round: was ${roundBefore}, now ${roundAfter}`)
+  if (!stateAfter) {
+    fail(`host refresh lost the round entirely, screen reads "${textAfter.split('\n').filter(Boolean).slice(0, 3).join(' | ')}"`)
+  } else if (stateAfter.roundIndex !== roundBefore) {
+    fail(`host refresh restored the wrong round: index was ${roundBefore}, now ${stateAfter.roundIndex}`)
+  }
+  if (JSON.stringify(stateAfter?.scores) !== JSON.stringify(stateBefore?.scores)) {
+    fail(`host refresh changed the scores: ${JSON.stringify(stateBefore?.scores)} became ${JSON.stringify(stateAfter?.scores)}`)
+  }
+  if (!/round|hearsay|testimony|evidence|verdict/i.test(textAfter)) {
+    fail(`host refresh left a blank looking screen: "${textAfter.split('\n').filter(Boolean).slice(0, 3).join(' | ')}"`)
   }
 
-  const rosterAfter = await hostRoster(host)
+  const rosterAfter = await hostRoster(host, code)
   if (rosterAfter.length !== rosterBefore.length) {
     fail(`host refresh lost players: ${rosterBefore.length} became ${rosterAfter.length}`)
   }
@@ -308,7 +339,8 @@ async function hostRefresh(browser) {
   // And the game has to keep working from the restored state.
   await hearsayStep(host, phones)
   await hearsayStep(host, phones)
-  const stillPlaying = /Round \d+ of \d+/.test(await hostText(host))
+  const moved = await hostState(host, code)
+  const stillPlaying = moved && (moved.roundIndex !== roundBefore || moved.phase !== stateBefore.phase)
   if (!stillPlaying) fail('the game did not continue after the host refresh')
   await checkLayout(host, 'host after refresh')
 
@@ -345,15 +377,16 @@ async function offlineAndBack(browser) {
   }
 
   // It must be showing the CURRENT round, not the screen it froze on.
-  const hostRound = (await hostText(host)).match(/Round (\d+)/)?.[1]
+  const hostRound = (await hostState(host, code))?.roundIndex
   await hearsayStep(host, phones)
   await sleep(2500)
   const phoneText = await dropped.page.evaluate(() => document.body.innerText).catch(() => '')
   if (!phoneText.trim()) fail(`${dropped.name} shows a blank screen after reconnecting`)
   note(`host is on round ${hostRound}, recovered phone reads "${phoneText.split('\n').filter(Boolean)[0]}"`)
 
-  const roster = await hostRoster(host)
+  const roster = await hostRoster(host, code)
   if (new Set(roster).size !== roster.length) fail(`roster gained a duplicate after a reconnect: ${roster.join(', ')}`)
+  if (roster.length !== phones.length) fail(`roster is ${roster.length} after a reconnect, expected ${phones.length}`)
 
   await cleanup([hostCtx, ...phones.map((p) => p.ctx)])
 }
@@ -367,7 +400,7 @@ async function lateJoin(browser) {
   if (!(await pickAndStart(host, 'Hearsay'))) return cleanup([hostCtx, ...phones.map((p) => p.ctx)])
   for (let i = 0; i < 3; i++) await hearsayStep(host, phones)
 
-  const rosterBefore = await hostRoster(host)
+  const rosterBefore = await hostRoster(host, code)
 
   const ctx = await browser.newContext({ ...devices['iPhone 13'] })
   await ctx.addInitScript(REJECTION_HOOK)
@@ -381,7 +414,7 @@ async function lateJoin(browser) {
   await sleep(6000)
   await shot(late, 'latecomer')
 
-  const rosterAfter = await hostRoster(host)
+  const rosterAfter = await hostRoster(host, code)
   if (rosterAfter.length !== rosterBefore.length) {
     fail(`a late joiner got into a running game: roster went from ${rosterBefore.length} to ${rosterAfter.length}`)
   }
@@ -401,7 +434,7 @@ async function lateJoin(browser) {
     await sleep(150)
   }
   await sleep(2500)
-  const rosterFinal = await hostRoster(host)
+  const rosterFinal = await hostRoster(host, code)
   if (rosterFinal.length !== rosterBefore.length) {
     fail(`hammering join from a late phone corrupted the roster: ${rosterFinal.join(', ')}`)
   }
@@ -419,15 +452,12 @@ async function duplicateNames(browser) {
   await sleep(2500)
   await shot(host, 'lobby')
 
-  const roster = await lobbyRoster(host)
-  if (roster.length !== 4) fail(`lobby shows ${roster.length} players for 4 phones (${roster.join(', ')})`)
-
-  // Same label is fine as long as something on screen still tells them apart.
-  const colors = await host.evaluate(() =>
-    [...document.querySelectorAll('main div.grid.place-items-center')].map((el) => getComputedStyle(el).backgroundColor)
-  )
-  if (new Set(colors).size !== colors.length) {
-    fail(`two players are indistinguishable: colours ${colors.join(' / ')}`)
+  const snap = await snapshot(host, code)
+  const roster = (snap?.players ?? [])
+  if (roster.length !== 4) fail(`lobby has ${roster.length} players for 4 phones (${roster.map((p) => p.name).join(', ')})`)
+  if (new Set(roster.map((p) => p.id)).size !== roster.length) fail('two players share an id')
+  if (new Set(roster.map((p) => p.color)).size !== roster.length) {
+    fail(`two players are indistinguishable: colours ${roster.map((p) => p.color).join(' / ')}`)
   }
 
   if (!(await pickAndStart(host, 'Hearsay'))) return cleanup([hostCtx, ...phones.map((p) => p.ctx)])
@@ -436,8 +466,25 @@ async function duplicateNames(browser) {
 
   // Both Sams must be independently votable, or one of them cannot be accused.
   const voter = phones.find((p) => p.name !== 'Sam')
-  const labels = await voter.page.locator('main button').allTextContents().catch(() => [])
-  note(`vote targets: ${labels.map((l) => l.trim()).join(' / ')}`)
+  const found = await voter.page
+    .waitForFunction(() => document.querySelectorAll('main button').length >= 4, { timeout: 30000 })
+    .then(() => true)
+    .catch(() => false)
+  if (!found) {
+    fail('never found a phone showing the full list of vote targets')
+  } else {
+    const swatches = await voter.page.evaluate(() =>
+      [...document.querySelectorAll('main button')].map((b) => {
+        const dot = b.querySelector('span[style*="background"]')
+        return dot ? getComputedStyle(dot).backgroundColor : null
+      })
+    )
+    const real = swatches.filter(Boolean)
+    if (real.length >= 4 && new Set(real).size !== real.length) {
+      fail(`two vote targets look identical: ${real.join(' / ')}`)
+    }
+    note(`vote target swatches: ${real.join(' / ') || 'none rendered'}`)
+  }
   await checkLayout(host, 'host with duplicate names')
 
   await cleanup([hostCtx, ...phones.map((p) => p.ctx)])
@@ -465,9 +512,9 @@ async function silentPlayer(browser) {
       const n = await buttons.count().catch(() => 0)
       if (n > 0) await buttons.nth(0).click().catch(() => {})
     }
-    const text = await hostText(host)
-    if (/knew it|had no idea/i.test(text)) sawVerdict = true
-    if (/Round 2 of/.test(text)) sawRound2 = true
+    const state = await hostState(host, code)
+    if (state?.phase === 'verdict') sawVerdict = true
+    if ((state?.roundIndex ?? 0) >= 1) sawRound2 = true
     if (sawVerdict && sawRound2) break
     await sleep(1500)
   }
@@ -488,10 +535,7 @@ async function tapSpam(browser) {
   await sleep(2000)
   if (!(await pickAndStart(host, 'Hearsay'))) return cleanup([hostCtx, ...phones.map((p) => p.ctx)])
 
-  const scoreOf = async () => {
-    const nums = await host.locator('footer span.text-2xl').allTextContents()
-    return nums.map((n) => Number(n.trim()) || 0)
-  }
+  const scoreOf = async () => Object.values((await hostState(host, code))?.scores ?? {})
 
   for (let round = 0; round < 3; round++) {
     for (let step = 0; step < 6; step++) {
@@ -512,6 +556,18 @@ async function tapSpam(browser) {
 
       const text = await hostText(host)
       if (!text.trim()) fail('host screen went blank while being hammered')
+      const st = await hostState(host, code)
+      if (st) {
+        const round = st.rounds[st.roundIndex]
+        // One vote per voter, one prediction per voter, one pick. Anything more
+        // than that means a burst of taps was counted more than once.
+        const voters = st.players.filter((p) => p.id !== round.accusedId).length
+        if (Object.keys(round.votes).length > voters) fail(`round has ${Object.keys(round.votes).length} votes for ${voters} voters`)
+        if (Object.keys(round.predictions).length > voters) {
+          fail(`round has ${Object.keys(round.predictions).length} predictions for ${voters} voters`)
+        }
+        if (round.votes[round.accusedId] !== undefined) fail('the accused managed to vote in their own round')
+      }
     }
     const scores = await scoreOf()
     // Hearsay pays 1000 for the chair and 500 for reading the room. A spammed
@@ -524,9 +580,9 @@ async function tapSpam(browser) {
     for (const p of phones) await checkLayout(p.page, `${p.name} under spam`)
   }
 
-  const finalText = await hostText(host)
-  if (!/Round \d+ of \d+|Final verdict/.test(finalText)) {
-    fail(`spamming taps left the host stuck: "${finalText.split('\n').filter(Boolean).slice(0, 3).join(' | ')}"`)
+  const finalState = await hostState(host, code)
+  if (!finalState || finalState.roundIndex === 0) {
+    fail(`spamming taps left the host stuck on round ${finalState?.roundIndex} phase ${finalState?.phase}`)
   }
   await shot(host, 'after-spam')
 
@@ -718,8 +774,8 @@ async function groupSizes(browser) {
     const phones = []
     for (const n of names) phones.push(await joinPhone(browser, code, n))
     await sleep(3000)
-    const roster = await lobbyRoster(host)
-    if (roster.length !== 8) fail(`lobby shows ${roster.length} of 8 players`)
+    const roster = await hostRoster(host, code)
+    if (roster.length !== 8) fail(`lobby has ${roster.length} of 8 players`)
     await checkLayout(host, 'host lobby with 8 players')
     await shot(host, 'lobby-8')
 

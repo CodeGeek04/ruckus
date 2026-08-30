@@ -1,6 +1,6 @@
 'use client'
 
-import { Button, Slab, Sticker } from '@/components/kit'
+import { Button, Sticker } from '@/components/kit'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 
@@ -42,32 +42,32 @@ export default function Landing() {
           </p>
         </div>
 
-        <Slab className="w-full max-w-sm p-5" tilt={-1}>
-          <form
-            className="flex flex-col gap-4"
-            onSubmit={(e) => {
-              e.preventDefault()
-              if (ready) router.push(`/play/${code.trim().toUpperCase()}`)
-            }}
-          >
-            <label className="text-center text-xs font-extrabold tracking-[0.3em] uppercase opacity-60">
-              Room code
-            </label>
-            <input
-              value={code}
-              onChange={(e) => setCode(e.target.value.toUpperCase().slice(0, 4))}
-              placeholder="••••"
-              autoCapitalize="characters"
-              autoComplete="off"
-              inputMode="text"
-              aria-label="Room code"
-              className="slab-sm w-full bg-[var(--color-paper)] py-5 text-center font-mono text-5xl font-bold tracking-[0.25em] outline-none"
-            />
-            <Button disabled={!ready} size="lg" tone="pink" className="w-full">
-              {ready ? 'Join' : 'Four letters'}
-            </Button>
-          </form>
-        </Slab>
+        {/* No wrapping card: a container holding two containers is a nested
+            card, and the field itself is already the surface. */}
+        <form
+          className="flex w-full max-w-sm flex-col gap-4"
+          onSubmit={(e) => {
+            e.preventDefault()
+            if (ready) router.push(`/play/${code.trim().toUpperCase()}`)
+          }}
+        >
+          <input
+            value={code}
+            onChange={(e) => setCode(e.target.value.toUpperCase().slice(0, 4))}
+            placeholder="CODE"
+            autoCapitalize="characters"
+            autoComplete="off"
+            inputMode="text"
+            aria-label="Room code"
+            className="slab w-full bg-[var(--color-chalk)] py-6 text-center font-mono text-6xl font-bold tracking-[0.2em] outline-none placeholder:opacity-25"
+          />
+          <Button disabled={!ready} size="lg" tone="pink" className="w-full">
+            Join
+          </Button>
+          <p className="text-center font-mono text-xs font-bold lowercase opacity-50">
+            {ready ? 'go on then' : 'four letters, on the big screen'}
+          </p>
+        </form>
 
         <button
           onClick={() => router.push('/host')}

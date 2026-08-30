@@ -1,138 +1,310 @@
 'use client'
 
-import { PlayerChip } from '@/components/PlayerChip'
+import { Aside, Face, Field, Slab, Sticker, type Hue } from '@/components/kit'
+import { flavorFor } from '@/lib/flavor'
+import type { Player } from '@/lib/types'
+import type { Phase } from './state'
 import type { HearsayHostView } from './views'
 
-function VoteBar({ view }: { view: HearsayHostView }) {
-  const max = Math.max(1, ...Object.values(view.voteCounts))
+/**
+ * The host screen is a stage, not a dashboard.
+ *
+ * Every phase drenches the whole frame in its own colour, so the room can tell
+ * what is happening from the far side of a lounge without reading a word. The
+ * frame is fixed: header, a middle row that flexes and clips, a footer. Nothing
+ * scrolls, nothing is allowed to fall off the bottom.
+ *
+ * The security boundary lives in views.ts, not here. `view.question` is null
+ * until the verdict and `view.voters` is null until the verdict, so this file
+ * physically cannot leak either one early.
+ */
+
+const PHASE_HUE: Record<Phase, Hue> = {
+  charge: 'violet',
+  testimony: 'blue',
+  evidence: 'yellow',
+  guess: 'orange',
+  verdict: 'pink',
+  scoreboard: 'mint',
+  ended: 'lime',
+}
+
+const PHASE_LABEL: Record<Phase, string> = {
+  charge: 'the charge',
+  testimony: 'testimony',
+  evidence: 'the evidence',
+  guess: 'deliberation',
+  verdict: 'verdict',
+  scoreboard: 'standings',
+  ended: 'closed',
+}
+
+/** Type that has to survive a compressed stream at four metres. */
+const HEADLINE = 'text-[clamp(2.2rem,6.5vw,5.5rem)] leading-[0.92] font-extrabold uppercase tracking-tighter'
+const SUB = 'text-[clamp(1rem,2vw,1.75rem)] font-extrabold uppercase tracking-tight'
+
+function totalVotes(view: HearsayHostView): number {
+  return Object.values(view.voteCounts).reduce((sum, n) => sum + n, 0)
+}
+
+/**
+ * The tally, as physical stacked blocks rather than a chart.
+ *
+ * Before the verdict a block is just the accused-of player's colour: a count,
+ * with no hint of who cast it. From the verdict onward each block takes the
+ * colour of the voter who cast it, so the room's colours visibly land on the
+ * answer.
+ */
+function Tally({ view }: { view: HearsayHostView }) {
+  const block = 'w-[clamp(2.5rem,5vw,4.75rem)] h-[clamp(0.8rem,2.1vh,1.5rem)]'
 
   return (
-    <div className="flex flex-col items-center gap-2">
-      <p className="text-sm font-black uppercase tracking-[0.3em] text-white/30">Votes</p>
-      <div className="flex items-end justify-center gap-5">
+    <div className="flex flex-wrap items-end justify-center gap-x-[clamp(0.6rem,2.2vw,2.25rem)] gap-y-2">
       {view.players.map((player) => {
         const count = view.voteCounts[player.id] ?? 0
-        const whoVoted = view.voters
-          ? Object.entries(view.voters).filter(([, target]) => target === player.id).map(([voter]) => voter)
+        const voterIds = view.voters
+          ? Object.entries(view.voters)
+              .filter(([, target]) => target === player.id)
+              .map(([voter]) => voter)
           : []
+        const leads = count > 0 && view.topVoted.includes(player.id)
 
         return (
-          <div key={player.id} className="flex flex-col items-center gap-2">
-            <div className="flex h-[22vh] w-16 items-end">
-              <div
-                className="w-full rounded-t-lg transition-all duration-700"
-                style={{ height: `${(count / max) * 100}%`, backgroundColor: player.color, minHeight: count ? 12 : 0 }}
-              />
+          <div key={player.id} className="flex flex-col items-center gap-1.5">
+            <span className="tnum text-[clamp(1.1rem,2.2vw,2rem)] leading-none font-extrabold">
+              {count}
+            </span>
+
+            <div className="flex flex-col-reverse gap-[3px]">
+              {count === 0 && (
+                <div
+                  className={`${block} rounded-[10px] border-[3px] border-dashed opacity-30`}
+                  style={{ borderColor: 'var(--color-ink)' }}
+                />
+              )}
+              {Array.from({ length: count }, (_, i) => {
+                const voter = view.players.find((p) => p.id === voterIds[i])
+                return (
+                  <div
+                    key={i}
+                    className={`pop slab-sm ${block}`}
+                    style={{
+                      backgroundColor: voter ? voter.color : player.color,
+                      animationDelay: `${i * 60}ms`,
+                    }}
+                  />
+                )
+              })}
             </div>
-            <div className="text-3xl font-black text-white tabular-nums">{count}</div>
-            <PlayerChip player={player} size="sm" />
-            {whoVoted.length > 0 && (
-              <div className="flex gap-1">
-                {whoVoted.map((voterId) => {
-                  const voter = view.players.find((p) => p.id === voterId)!
-                  return <div key={voterId} className="h-3 w-3 rounded-full" style={{ backgroundColor: voter.color }} />
-                })}
-              </div>
-            )}
+
+            <Face name={player.name} color={player.color} size="sm" dim={!leads && count === 0} />
           </div>
         )
       })}
-      </div>
     </div>
   )
 }
 
-export function HearsayHostScreen({ view }: { view: HearsayHostView }) {
+function Standings({ view, awarded }: { view: HearsayHostView; awarded: boolean }) {
+  const ranked = [...view.players].sort((a, b) => (view.scores[b.id] ?? 0) - (view.scores[a.id] ?? 0))
+
   return (
-    <div className="grid h-full grid-rows-[auto_minmax(0,1fr)_auto] gap-3 overflow-hidden p-8">
-      <header className="flex items-center justify-between pr-36 text-white/50">
-        <span className="text-2xl font-black uppercase tracking-widest">Hearsay</span>
-        <span className="text-2xl font-bold tabular-nums">
-          Round {view.roundNumber} of {view.totalRounds}
-        </span>
-      </header>
+    <div className="flex w-full max-w-3xl flex-col gap-[clamp(0.3rem,1vh,0.7rem)]">
+      {ranked.map((player, index) => (
+        <Slab
+          key={player.id}
+          tone={index === 0 ? 'yellow' : 'chalk'}
+          tilt={index === 0 ? -0.8 : 0}
+          className="rise flex items-center gap-[clamp(0.6rem,1.6vw,1.5rem)] px-4 py-[clamp(0.25rem,0.9vh,0.6rem)]"
+          style={{ animationDelay: `${index * 60}ms` }}
+        >
+          <span className="tnum w-9 text-[clamp(0.9rem,1.8vw,1.6rem)] font-extrabold opacity-35">
+            {index + 1}
+          </span>
+          <span
+            className="slab-sm grid h-[clamp(1.7rem,3.2vh,2.4rem)] w-[clamp(1.7rem,3.2vh,2.4rem)] shrink-0 place-items-center text-[clamp(0.6rem,1.1vw,0.95rem)] font-extrabold uppercase"
+            style={{ backgroundColor: player.color, borderRadius: 999 }}
+          >
+            {player.name.slice(0, 2)}
+          </span>
+          <span className="flex-1 truncate text-[clamp(1rem,2.2vw,2rem)] font-extrabold uppercase tracking-tight">
+            {player.name}
+          </span>
+          {awarded && (view.awarded[player.id] ?? 0) > 0 && (
+            <span className="tnum stamp text-[clamp(0.85rem,1.6vw,1.4rem)] font-extrabold">
+              +{view.awarded[player.id]}
+            </span>
+          )}
+          <span className="tnum text-[clamp(1rem,2.2vw,2rem)] font-extrabold">
+            {view.scores[player.id] ?? 0}
+          </span>
+        </Slab>
+      ))}
+    </div>
+  )
+}
 
-      <main className="flex min-h-0 flex-col items-center justify-center gap-5 overflow-hidden text-center">
-        {view.phase === 'charge' && (
-          <>
-            <p className="text-[clamp(1.2rem,2vw,2rem)] font-bold uppercase tracking-widest text-white/50">The room is being asked</p>
-            <p className="text-[clamp(2.5rem,6vw,5rem)] font-black uppercase leading-none text-white">something about {view.accusedName}</p>
-            <p className="text-[clamp(1.2rem,2vw,1.75rem)] font-bold text-yellow-400">{view.accusedName}, mute yourself.</p>
-          </>
-        )}
+/**
+ * The commentary line, built only from facts this view already carries.
+ * Presentation only: it can be absent and nothing moves.
+ */
+function verdictLine(view: HearsayHostView): string | null {
+  const cast = totalVotes(view)
+  if (cast === 0) return null
 
-        {view.phase === 'testimony' && (
-          <>
-            <p className="text-[clamp(3rem,8vw,6rem)] font-black uppercase leading-none text-white">Testimony</p>
-            <p className="text-[clamp(1.2rem,2.2vw,2rem)] font-bold text-white/60">The room is deciding.</p>
-          </>
-        )}
+  const receivers = view.players.filter((p) => (view.voteCounts[p.id] ?? 0) > 0).length
+  const top = Math.max(...view.players.map((p) => view.voteCounts[p.id] ?? 0))
 
-        {view.phase === 'evidence' && (
-          <>
-            <p className="text-[clamp(2rem,4vw,3.5rem)] font-black uppercase leading-none text-white">The Evidence</p>
-            <VoteBar view={view} />
-            <p className="text-[clamp(1rem,1.8vw,1.6rem)] font-bold text-white/60">
-              {view.accusedName}, what do you think they were asked?
-            </p>
-          </>
-        )}
+  return flavorFor({
+    game: 'hearsay',
+    kind: 'verdict',
+    correct: view.accusedPickedCorrectly === true,
+    unanimous: receivers === 1 && cast >= 2,
+    selfIncriminated: view.topVoted.length === 1 && view.topVoted[0] === view.accusedId,
+    landslide: view.topVoted.length === 1 && top > cast / 2 && cast >= 3,
+    round: view.roundNumber,
+  })
+}
 
-        {view.phase === 'guess' && (
-          <>
-            <p className="text-[clamp(2rem,4vw,3.5rem)] font-black uppercase leading-none text-white">{view.accusedName} is deciding</p>
-            <VoteBar view={view} />
-            <div className="flex gap-10 text-[clamp(1.2rem,2.4vw,2.25rem)] font-black">
-              <span className="text-green-400">{view.crowdPredictions.yes} say yes</span>
-              <span className="text-red-400">{view.crowdPredictions.no} say no</span>
-            </div>
-          </>
-        )}
+export function HearsayHostScreen({ view }: { view: HearsayHostView }) {
+  const accused = view.players.find((p: Player) => p.id === view.accusedId)
+  const correct = view.accusedPickedCorrectly === true
 
-        {(view.phase === 'verdict' || view.phase === 'scoreboard') && (
-          <>
-            <p className="text-[clamp(1rem,1.6vw,1.5rem)] font-bold uppercase tracking-widest text-white/50">The charge was</p>
-            <p className="max-w-5xl text-[clamp(1.8rem,4vw,3.75rem)] font-black leading-tight text-white">{view.question}</p>
-            <VoteBar view={view} />
-            <p className={`text-[clamp(1.8rem,3.5vw,3rem)] font-black uppercase leading-none ${view.accusedPickedCorrectly ? 'text-green-400' : 'text-red-500'}`}>
-              {view.accusedPickedCorrectly ? `${view.accusedName} knew it` : `${view.accusedName} had no idea`}
-            </p>
-          </>
-        )}
+  return (
+    <Field hue={PHASE_HUE[view.phase]} pattern={view.phase === 'verdict' ? 'stripes' : 'dots'}>
+      <div className="grid h-full grid-rows-[auto_minmax(0,1fr)_auto] gap-3 overflow-hidden p-8">
+        <header className="flex items-center gap-4 pr-40">
+          <span className="text-[clamp(1.1rem,1.8vw,1.6rem)] font-extrabold tracking-tighter uppercase">
+            Hearsay
+          </span>
+          <Sticker tone="chalk" tilt={-2}>
+            {PHASE_LABEL[view.phase]}
+          </Sticker>
+          <span className="tnum ml-auto font-mono text-[clamp(0.75rem,1.3vw,1.05rem)] font-bold tracking-widest uppercase opacity-60">
+            Round {view.roundNumber} / {view.totalRounds}
+          </span>
+        </header>
 
-        {view.phase === 'ended' && (
-          <>
-            <p className="text-4xl font-bold uppercase tracking-widest text-white/50">Final verdict</p>
-            {[...view.players]
+        <main className="flex min-h-0 flex-col items-center justify-center gap-[clamp(0.5rem,2vh,1.5rem)] overflow-hidden text-center">
+          {view.phase === 'charge' && (
+            <>
+              <Sticker tone="chalk" tilt={-3}>
+                the room is being asked
+              </Sticker>
+              <p className={`${HEADLINE} stamp max-w-6xl`}>
+                something about {view.accusedName}
+              </p>
+              {accused && (
+                <div className="wobble">
+                  <Face name={accused.name} color={accused.color} size="lg" />
+                </div>
+              )}
+              <Slab tone="ink" className="px-6 py-2.5">
+                <p className={SUB}>{view.accusedName}, mute yourself</p>
+              </Slab>
+            </>
+          )}
+
+          {view.phase === 'testimony' && (
+            <>
+              <p className={`${HEADLINE} stamp`}>Testimony</p>
+              <p className={`${SUB} opacity-70`}>the room is deciding</p>
+              <Slab tone="chalk" className="px-8 py-3" tilt={1.5}>
+                <p className="tnum text-[clamp(1.5rem,3.5vw,3rem)] font-extrabold uppercase">
+                  {totalVotes(view)} of {Math.max(0, view.players.length - 1)} in
+                </p>
+              </Slab>
+            </>
+          )}
+
+          {view.phase === 'evidence' && (
+            <>
+              <p className={`${HEADLINE} stamp`}>The evidence</p>
+              <Tally view={view} />
+              <p className={`${SUB} opacity-70`}>
+                {view.accusedName}, what were they asked?
+              </p>
+            </>
+          )}
+
+          {view.phase === 'guess' && (
+            <>
+              <p className={`${HEADLINE} stamp max-w-5xl`}>{view.accusedName} is deciding</p>
+              <Tally view={view} />
+              <div className="flex gap-4">
+                <Slab tone="mint" className="px-6 py-2">
+                  <p className="tnum text-[clamp(1rem,2.2vw,1.8rem)] font-extrabold uppercase">
+                    {view.crowdPredictions.yes} say yes
+                  </p>
+                </Slab>
+                <Slab tone="red" className="px-6 py-2">
+                  <p className="tnum text-[clamp(1rem,2.2vw,1.8rem)] font-extrabold uppercase">
+                    {view.crowdPredictions.no} say no
+                  </p>
+                </Slab>
+              </div>
+            </>
+          )}
+
+          {view.phase === 'verdict' && (
+            <>
+              <Sticker tone="chalk" tilt={-2}>
+                the charge was
+              </Sticker>
+              <Slab tone="chalk" className="max-w-5xl px-6 py-3" tilt={-0.8}>
+                <p className="text-[clamp(1.1rem,2.9vw,2.6rem)] leading-tight font-extrabold">
+                  {view.question}
+                </p>
+              </Slab>
+              <Tally view={view} />
+              <Slab tone={correct ? 'lime' : 'red'} className="stamp px-7 py-2.5" tilt={1.2}>
+                <p className="text-[clamp(1.3rem,3.2vw,2.75rem)] leading-none font-extrabold uppercase tracking-tighter">
+                  {correct ? `${view.accusedName} knew it` : `${view.accusedName} had no idea`}
+                </p>
+              </Slab>
+              <Aside line={verdictLine(view)} />
+            </>
+          )}
+
+          {view.phase === 'scoreboard' && (
+            <>
+              <Sticker tone="chalk" tilt={-2}>
+                standings
+              </Sticker>
+              <Standings view={view} awarded />
+            </>
+          )}
+
+          {view.phase === 'ended' && (
+            <>
+              <p className="text-[clamp(1.6rem,4vw,3.25rem)] leading-none font-extrabold uppercase tracking-tighter">
+                Final verdict
+              </p>
+              <Standings view={view} awarded={false} />
+            </>
+          )}
+        </main>
+
+        <footer className="flex items-end justify-center gap-[clamp(0.75rem,2.5vw,2.5rem)] pr-[22rem]">
+          {view.phase !== 'scoreboard' &&
+            view.phase !== 'ended' &&
+            [...view.players]
               .sort((a, b) => (view.scores[b.id] ?? 0) - (view.scores[a.id] ?? 0))
-              .map((player, index) => (
-                <div key={player.id} className="flex items-center gap-6 text-6xl font-black">
-                  <span className="w-16 text-white/30 tabular-nums">{index + 1}</span>
-                  <span className="h-10 w-10 rounded-full" style={{ backgroundColor: player.color }} />
-                  <span className={index === 0 ? 'text-yellow-400' : 'text-white'}>{player.name}</span>
-                  <span className="tabular-nums text-white/60">{view.scores[player.id] ?? 0}</span>
+              .map((player) => (
+                <div key={player.id} className="flex items-center gap-2">
+                  <Face name={player.name} color={player.color} size="sm" />
+                  <span className="tnum text-[clamp(0.9rem,1.8vw,1.5rem)] font-extrabold">
+                    {view.scores[player.id] ?? 0}
+                  </span>
+                  {(view.awarded[player.id] ?? 0) > 0 && view.phase !== 'charge' && (
+                    <span className="tnum stamp text-[clamp(0.7rem,1.2vw,1rem)] font-extrabold opacity-70">
+                      +{view.awarded[player.id]}
+                    </span>
+                  )}
                 </div>
               ))}
-          </>
-        )}
-      </main>
-
-      <footer className="flex flex-col items-center gap-1 pr-56">
-        <p className="text-xs font-black uppercase tracking-[0.3em] text-white/25">Scores</p>
-        <div className="flex items-end justify-center gap-8">
-        {[...view.players]
-          .sort((a, b) => (view.scores[b.id] ?? 0) - (view.scores[a.id] ?? 0))
-          .map((player) => (
-            <div key={player.id} className="flex flex-col items-center gap-1">
-              <PlayerChip player={player} size="sm" />
-              <span className="text-2xl font-black text-white tabular-nums">{view.scores[player.id] ?? 0}</span>
-              {(view.awarded[player.id] ?? 0) > 0 && view.phase !== 'charge' && (
-                <span className="text-lg font-bold text-green-400">+{view.awarded[player.id]}</span>
-              )}
-            </div>
-          ))}
-        </div>
-      </footer>
-    </div>
+        </footer>
+      </div>
+    </Field>
   )
 }
