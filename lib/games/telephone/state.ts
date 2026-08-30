@@ -46,7 +46,12 @@ export type TelephoneConfig = {
     /** Awarded to every contributor to the chain the room votes best. */
     winningChain: number
   }
-  durations: Record<Exclude<Phase, 'ended'>, number>
+  /*
+   * Deliberately no durations. This game has no deadlines: the host paces it.
+   * Leaving them here would be worse than dead config, because the host
+   * runtime restarts a phase timer from config.durations after a refresh, and
+   * a refresh would quietly bring the countdown back.
+   */
   /** Clamped down to the player count: a chain must never revisit a player. */
   maxSteps: number
   maxTextLength: number
@@ -54,15 +59,6 @@ export type TelephoneConfig = {
 
 export const DEFAULT_CONFIG: TelephoneConfig = {
   scoring: { winningChain: 1000 },
-  durations: {
-    write: 45000,
-    describe: 45000,
-    // Generation measured at roughly 12s. This is the backstop that stops a
-    // stuck phone from hanging the room, not the expected wait.
-    drawing: 45000,
-    reveal: 6000,
-    vote: 30000,
-  },
   maxSteps: 6,
   maxTextLength: 100,
 }

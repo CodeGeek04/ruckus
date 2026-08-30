@@ -16,7 +16,6 @@ import {
 export function scoreRound(round: Round, config: WhoSaidItConfig): Record<PlayerId, number> {
   const awarded: Record<PlayerId, number> = {}
   for (const [guesserId, target] of Object.entries(round.guesses)) {
-    if (guesserId === round.authorPlayerId) continue
     if (target === round.author) awarded[guesserId] = config.scoring.correctGuess
   }
   return awarded
@@ -32,8 +31,7 @@ export function mostFooledBy(
   config: WhoSaidItConfig
 ): { authors: AuthorKey[]; count: number } | null {
   const counts = new Map<AuthorKey, number>()
-  for (const [guesserId, target] of Object.entries(round.guesses)) {
-    if (guesserId === round.authorPlayerId) continue
+  for (const [, target] of Object.entries(round.guesses)) {
     if (target === round.author) continue
     counts.set(target, (counts.get(target) ?? 0) + 1)
   }
@@ -202,16 +200,13 @@ function applyInput(
 
   const round = state.rounds[state.roundIndex]
   if (!round) return { state }
-  // You wrote it, so you are never asked, and you can never stall the round.
-  if (playerId === round.authorPlayerId) return { state }
   if (!round.candidates.includes(input.target)) return { state }
 
   const guesses = { ...round.guesses, [playerId]: input.target }
   const updated = withRound(state, { ...round, guesses })
 
-  const everyoneGuessed = state.players
-    .filter((p) => p.id !== round.authorPlayerId)
-    .every((p) => guesses[p.id] !== undefined)
+  // Everyone, the author included: they are guessing like everybody else.
+  const everyoneGuessed = state.players.every((p) => guesses[p.id] !== undefined)
 
   return everyoneGuessed ? enterReveal(updated) : { state: updated }
 }

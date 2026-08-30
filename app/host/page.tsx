@@ -117,7 +117,7 @@ const ADVANCE_LABELS: Record<string, Record<string, string>> = {
   telephone: {
     write: 'Start drawing',
     describe: 'Start drawing',
-    drawing: 'Skip wait',
+    drawing: 'Give up waiting',
     reveal: 'Next',
     vote: 'Results',
   },

@@ -29,9 +29,11 @@ describe('scoreRound', () => {
     expect(scoreRound(round({ guesses: {} }), DEFAULT_CONFIG)).toEqual({})
   })
 
-  it('never pays the author for their own round', () => {
+  it('pays the author too, because they are guessing like everyone else', () => {
+    // People forget what they typed. The author is asked the same question as
+    // the room, so a correct answer pays the same.
     const scores = scoreRound(round({ guesses: { sam: 'shivam', mike: 'shivam' } }), DEFAULT_CONFIG)
-    expect(scores.sam ?? 0).toBe(0)
+    expect(scores.sam).toBe(500)
     expect(scores.mike).toBe(500)
   })
 
@@ -55,9 +57,9 @@ describe('mostFooledBy', () => {
     expect(mostFooledBy(round({ guesses: { mike: 'shivam', ron: 'shivam', emily: 'shivam' } }), DEFAULT_CONFIG)).toBeNull()
   })
 
-  it('ignores a guess cast by the author, who is never asked in a real round', () => {
+  it('counts the author among the fooled when they pick the wrong name', () => {
     const fooled = mostFooledBy(round({ guesses: { sam: 'aman', mike: 'aman', emily: 'shivam' } }), DEFAULT_CONFIG)
-    expect(fooled).toBeNull()
+    expect(fooled).toEqual({ authors: ['aman'], count: 2 })
   })
 
   it('reports every author tied at the top', () => {

@@ -65,22 +65,6 @@ export function WhoSaidItPlayerScreen({
     )
   }
 
-  // You wrote it. You are not guessing, and you are not being asked to.
-  if (view.isAuthor && view.phase === 'message') {
-    return (
-      <Panel hue="yellow">
-        <Sticker tone="chalk" tilt={-3}>
-          this one is yours
-        </Sticker>
-        <p className="text-4xl leading-none font-extrabold tracking-tighter uppercase">You typed this</p>
-        <div className="w-full text-left">
-          <Quote text={view.message} />
-        </div>
-        <p className="font-mono text-sm font-bold lowercase opacity-65">say nothing. let them work.</p>
-      </Panel>
-    )
-  }
-
   if (view.action === 'guess') {
     return (
       <div
@@ -145,7 +129,7 @@ export function WhoSaidItPlayerScreen({
         )}
         {view.isAuthor && (
           <Sticker tone="yellow" tilt={2}>
-            that was you
+            {view.wasCorrect === false ? 'that was you. you forgot.' : 'that was you'}
           </Sticker>
         )}
       </Panel>

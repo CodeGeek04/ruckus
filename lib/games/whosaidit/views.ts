@@ -83,7 +83,8 @@ export function whoSaidItHostView(state: WhoSaidItState): WhoSaidItHostView {
     message: round.text,
     candidates: round.candidates,
     guessedCount: guessEntries.length,
-    expectedGuesses: state.players.filter((p) => p.id !== round.authorPlayerId).length,
+    // Everyone guesses, the author included.
+    expectedGuesses: state.players.length,
     author: show ? round.author : null,
     guesses: show ? round.guesses : null,
     correctIds: show ? guessEntries.filter(([, t]) => t === round.author).map(([g]) => g) : [],
@@ -101,7 +102,7 @@ export function whoSaidItPlayerView(state: WhoSaidItState, playerId: PlayerId): 
 
   return {
     phase: state.phase,
-    action: round && state.phase === 'message' && !isAuthor ? 'guess' : 'wait',
+    action: round && state.phase === 'message' ? 'guess' : 'wait',
     roundNumber: round ? state.roundIndex + 1 : 0,
     totalRounds: state.rounds.length,
     message: round ? round.text : null,
@@ -115,7 +116,7 @@ export function whoSaidItPlayerView(state: WhoSaidItState, playerId: PlayerId): 
     candidates: round ? round.candidates : [],
     myGuess: round ? round.guesses[playerId] ?? null : null,
     authorName: show && round ? round.author : null,
-    wasCorrect: show && round && !isAuthor ? round.guesses[playerId] === round.author : null,
+    wasCorrect: show && round ? round.guesses[playerId] === round.author : null,
     myScore: state.scores[playerId] ?? 0,
     problem: state.problem,
   }

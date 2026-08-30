@@ -212,13 +212,13 @@ describe('message phase', () => {
     expect(next.rounds[0].guesses.mike).toBe('aman')
   })
 
-  it('ignores a guess from the person who wrote it', () => {
+  it('accepts a guess from the person who wrote it', () => {
     const next = reduceWhoSaidIt(withAuthor('shivam', 'sam'), {
       type: 'input',
       playerId: 'sam',
       payload: { kind: 'guess', target: 'aman' },
     }).state
-    expect(next.rounds[0].guesses.sam).toBeUndefined()
+    expect(next.rounds[0].guesses.sam).toBe('aman')
   })
 
   it('ignores a guess from someone who is not in the game', () => {
@@ -251,22 +251,25 @@ describe('message phase', () => {
     expect(state.rounds[0].guesses.mike).toBe('kushagra')
   })
 
-  it('reveals early once everyone who can guess has guessed', () => {
+  it('reveals early once everyone has guessed, the author included', () => {
     let state = withAuthor('shivam', 'sam')
-    for (const id of ['mike', 'ron']) {
+    for (const id of ['mike', 'ron', 'emily']) {
       state = reduceWhoSaidIt(state, { type: 'input', playerId: id, payload: { kind: 'guess', target: 'shivam' } }).state
       expect(state.phase).toBe('message')
     }
-    state = reduceWhoSaidIt(state, { type: 'input', playerId: 'emily', payload: { kind: 'guess', target: 'aman' } }).state
+    state = reduceWhoSaidIt(state, { type: 'input', playerId: 'sam', payload: { kind: 'guess', target: 'aman' } }).state
     expect(state.phase).toBe('reveal')
   })
 
-  it('does not wait on the player who wrote it', () => {
-    // Sam is linked to shivam, so the round closes on the other three alone.
+  it('waits on the player who wrote it, because they answer too', () => {
+    // Sam wrote it and still gets asked, so three of four is not enough.
     let state = withAuthor('shivam', 'sam')
     for (const id of ['mike', 'ron', 'emily']) {
       state = reduceWhoSaidIt(state, { type: 'input', playerId: id, payload: { kind: 'guess', target: 'riya' } }).state
     }
+    expect(state.phase).toBe('message')
+
+    state = reduceWhoSaidIt(state, { type: 'input', playerId: 'sam', payload: { kind: 'guess', target: 'riya' } }).state
     expect(state.phase).toBe('reveal')
   })
 
@@ -297,6 +300,8 @@ describe('scoring on reveal', () => {
     state = reduceWhoSaidIt(state, { type: 'input', playerId: 'mike', payload: { kind: 'guess', target: 'shivam' } }).state
     state = reduceWhoSaidIt(state, { type: 'input', playerId: 'ron', payload: { kind: 'guess', target: 'shivam' } }).state
     state = reduceWhoSaidIt(state, { type: 'input', playerId: 'emily', payload: { kind: 'guess', target: 'riya' } }).state
+    // Sam wrote it, and did not recognise himself.
+    state = reduceWhoSaidIt(state, { type: 'input', playerId: 'sam', payload: { kind: 'guess', target: 'aman' } }).state
 
     expect(state.phase).toBe('reveal')
     expect(state.scores.mike).toBe(500)

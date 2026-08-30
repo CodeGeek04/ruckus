@@ -77,7 +77,8 @@ describe('whoSaidItHostView', () => {
     state = reduceWhoSaidIt(state, { type: 'input', playerId: 'mike', payload: { kind: 'guess', target: 'aman' } }).state
     const view = whoSaidItHostView(state)
     expect(view.guessedCount).toBe(1)
-    expect(view.expectedGuesses).toBe(3)
+    // Four, not three: the author answers too.
+    expect(view.expectedGuesses).toBe(4)
     expect(view.guesses).toBeNull()
   })
 
@@ -90,11 +91,13 @@ describe('whoSaidItHostView', () => {
     state = reduceWhoSaidIt(state, { type: 'input', playerId: 'mike', payload: { kind: 'guess', target: 'shivam' } }).state
     state = reduceWhoSaidIt(state, { type: 'input', playerId: 'ron', payload: { kind: 'guess', target: 'kushagra' } }).state
     state = reduceWhoSaidIt(state, { type: 'input', playerId: 'emily', payload: { kind: 'guess', target: 'kushagra' } }).state
+    // Sam wrote it, and still has to answer like everybody else.
+    state = reduceWhoSaidIt(state, { type: 'input', playerId: 'sam', payload: { kind: 'guess', target: 'riya' } }).state
 
     const view = whoSaidItHostView(state)
     expect(view.phase).toBe('reveal')
     expect(view.author).toBe('shivam')
-    expect(view.guesses).toEqual({ mike: 'shivam', ron: 'kushagra', emily: 'kushagra' })
+    expect(view.guesses).toEqual({ mike: 'shivam', ron: 'kushagra', emily: 'kushagra', sam: 'riya' })
     expect(view.correctIds).toEqual(['mike'])
     expect(view.mostFooled).toEqual({ authors: ['kushagra'], count: 2 })
   })
@@ -133,9 +136,9 @@ describe('whoSaidItPlayerView', () => {
     expect(whoSaidItPlayerView(state, 'mike').isAuthor).toBe(false)
   })
 
-  it('asks everyone but the author to guess', () => {
+  it('asks everyone to guess, the author included', () => {
     const state = withAuthor('shivam', 'sam')
-    expect(whoSaidItPlayerView(state, 'sam').action).toBe('wait')
+    expect(whoSaidItPlayerView(state, 'sam').action).toBe('guess')
     expect(whoSaidItPlayerView(state, 'mike').action).toBe('guess')
   })
 
@@ -163,7 +166,8 @@ describe('whoSaidItPlayerView', () => {
     expect(whoSaidItPlayerView(state, 'mike').authorName).toBe('shivam')
     expect(whoSaidItPlayerView(state, 'ron').wasCorrect).toBe(false)
     expect(whoSaidItPlayerView(state, 'emily').wasCorrect).toBe(false)
-    expect(whoSaidItPlayerView(state, 'sam').wasCorrect).toBeNull()
+    // Sam wrote it, did not answer in time, and is simply wrong like anyone else.
+    expect(whoSaidItPlayerView(state, 'sam').wasCorrect).toBe(false)
   })
 
   it('keeps the viewer on their own list, so they can pick themselves', () => {

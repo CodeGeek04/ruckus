@@ -1,6 +1,6 @@
 // lib/games/telephone/reduce.ts
 import { truncate } from '@/lib/text'
-import type { Command, GameEvent, Player, PlayerId, Reduced } from '@/lib/types'
+import type { GameEvent, Player, PlayerId, Reduced } from '@/lib/types'
 import { chainForPlayer, playerForChain, stepCount } from './chains'
 import {
   DEFAULT_CONFIG,
@@ -9,7 +9,6 @@ import {
   playerIndexOf,
   type Chain,
   type Entry,
-  type Phase,
   type TelephoneConfig,
   type TelephoneInput,
   type TelephoneState,
@@ -35,10 +34,15 @@ export function initTelephone(players: Player[], config: TelephoneConfig = DEFAU
   }
 }
 
-const timer = (state: TelephoneState, phase: Exclude<Phase, 'ended'>): Command => ({
-  kind: 'timer',
-  ms: state.config.durations[phase],
-})
+/**
+ * Broken Telephone runs on the host's clock, not a countdown.
+ *
+ * Writing a sentence and describing a picture are the whole game, and a timer
+ * cutting somebody off mid thought was the worst thing that could happen to a
+ * round. The reveal is a performance the host paces by hand. So no phase here
+ * expires: the host advances, or a phase completes because everybody has
+ * genuinely finished.
+ */
 
 function withChain(state: TelephoneState, chainIndex: number, chain: Chain): TelephoneState {
   const chains = [...state.chains]
@@ -62,13 +66,13 @@ function nextStep(state: TelephoneState): Reduced<TelephoneState> {
   if (stepIndex >= state.steps) {
     return {
       state: { ...state, phase: 'reveal', reveal: { chainIndex: 0, beat: 0 } },
-      commands: [timer(state, 'reveal'), { kind: 'sound', name: 'reveal' }],
+      commands: [{ kind: 'sound', name: 'reveal' }],
     }
   }
 
   return {
     state: { ...state, stepIndex, phase: 'describe' },
-    commands: [timer(state, 'describe'), { kind: 'sound', name: 'step' }],
+    commands: [{ kind: 'sound', name: 'step' }],
   }
 }
 
@@ -109,7 +113,7 @@ function settle(state: TelephoneState): Reduced<TelephoneState> {
   if (!allDrawn(state)) {
     return state.phase === 'drawing'
       ? { state }
-      : { state: { ...state, phase: 'drawing' }, commands: [timer(state, 'drawing')] }
+      : { state: { ...state, phase: 'drawing' } }
   }
   return nextStep(state)
 }
@@ -146,17 +150,17 @@ function advanceReveal(state: TelephoneState): Reduced<TelephoneState> {
   const beat = state.reveal.beat + 1
 
   if (beat < beatsInChain(chain)) {
-    return { state: { ...state, reveal: { ...state.reveal, beat } }, commands: [timer(state, 'reveal')] }
+    return { state: { ...state, reveal: { ...state.reveal, beat } } }
   }
 
   const chainIndex = state.reveal.chainIndex + 1
   if (chainIndex >= state.chains.length) {
-    return { state: { ...state, phase: 'vote' }, commands: [timer(state, 'vote'), { kind: 'sound', name: 'vote' }] }
+    return { state: { ...state, phase: 'vote' }, commands: [{ kind: 'sound', name: 'vote' }] }
   }
 
   return {
     state: { ...state, reveal: { chainIndex, beat: 0 } },
-    commands: [timer(state, 'reveal'), { kind: 'sound', name: 'chain' }],
+    commands: [{ kind: 'sound', name: 'chain' }],
   }
 }
 

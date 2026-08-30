@@ -120,13 +120,19 @@ describe('writing a sentence', () => {
     expect(state.chains.every((c) => c.entries[0].imageUrl === null)).toBe(true)
   })
 
-  it('asks the runtime for a drawing timer as a backstop', () => {
+  it('never asks for a timer: the host owns the pace', () => {
+    // A countdown cutting somebody off mid sentence was the worst thing that
+    // could happen to a round, so this game has no deadlines at all.
     let state = initTelephone(players)
-    for (const id of ids.slice(0, 3)) {
+    for (const id of ids) {
+      const { commands } = reduceTelephone(state, {
+        type: 'input',
+        playerId: id,
+        payload: { kind: 'submit', text: 'x' },
+      })
+      expect(commands?.some((c) => c.kind === 'timer') ?? false).toBe(false)
       state = reduceTelephone(state, { type: 'input', playerId: id, payload: { kind: 'submit', text: 'x' } }).state
     }
-    const { commands } = reduceTelephone(state, { type: 'input', playerId: 'emily', payload: { kind: 'submit', text: 'x' } })
-    expect(commands).toContainEqual({ kind: 'timer', ms: DEFAULT_CONFIG.durations.drawing })
   })
 })
 

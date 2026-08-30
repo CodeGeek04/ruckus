@@ -36,7 +36,8 @@ export const telephone: GameModule<TelephoneState, TelephoneInput, TelephoneHost
   maxPlayers: 12,
   init: (players) => ({
     state: initTelephone(players, DEFAULT_CONFIG),
-    commands: [{ kind: 'timer', ms: DEFAULT_CONFIG.durations.write }],
+    // No opening timer: the host starts the writing and the host ends it.
+    commands: [],
   }),
   reduce: reduceTelephone,
   hostView: telephoneHostView,
