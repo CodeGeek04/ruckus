@@ -34,6 +34,27 @@
   --shadow-hard-lg: 10px 10px 0 var(--color-ink);
 
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /*
+   * One type scale, used everywhere. Fluid because the same host screen is
+   * shared at 720p and at 1440p, but every step is defined once so nothing
+   * invents its own size. Ratio is about 1.3 between steps.
+   */
+  --text-micro: clamp(0.68rem, 0.75vw, 0.82rem);
+  --text-label: clamp(0.8rem, 0.95vw, 1.05rem);
+  --text-body: clamp(0.95rem, 1.2vw, 1.3rem);
+  --text-lead: clamp(1.25rem, 1.7vw, 1.75rem);
+  --text-title: clamp(1.7rem, 2.4vw, 2.5rem);
+  --text-hero: clamp(2.4rem, 4vw, 4.2rem);
+  --text-mega: clamp(3.4rem, 6.2vw, 6.6rem);
+
+  /* Fixed dimensions for things that must never resize between states. */
+  --size-qr: clamp(96px, 11vh, 148px);
+  /* Tuned so header, join block, players, tiles, options and footer all fit
+     inside 720p without clipping, and still feel generous at 1080p. */
+  --row-players: clamp(4.6rem, 11vh, 7rem);
+  --row-tiles: clamp(6.4rem, 14vh, 9rem);
+  --row-options: clamp(6rem, 17vh, 11rem);
 }
 
 html,

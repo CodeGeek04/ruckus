@@ -120,6 +120,9 @@ function advanceLabel(gameId: string | undefined, phase: string | null): string 
   return ADVANCE_LABELS[gameId]?.[phase] ?? 'Next'
 }
 
+/** Fixed at mount: a QR that resizes when you change games is the jump. */
+const QR_PX = 132
+
 const subscribeNothing = () => () => {}
 const getOrigin = () => window.location.origin
 const getHostName = () => window.location.host
@@ -212,9 +215,6 @@ export default function HostPage() {
   const canStart = enoughPlayers && extra.ready
   const blockedReason = !enoughPlayers ? `Need ${selected.minPlayers} players` : extra.reason
 
-  // Who Said It brings its own author list, which needs the vertical room.
-  const hasSetupPanel = pick === 'whosaidit'
-
   if (game && view) {
     const Screen = game.HostScreen
     const ended = viewPhase(view) === 'ended'
@@ -253,48 +253,54 @@ export default function HostPage() {
 
   return (
     <main
-      className="grid h-full grid-rows-[auto_minmax(0,1fr)_auto] gap-3 overflow-hidden p-6 transition-colors duration-500"
+      className="relative grid h-full grid-rows-[auto_minmax(0,1fr)_auto] gap-4 overflow-hidden p-6"
       style={{ backgroundColor: 'var(--color-yellow)' }}
     >
       <div className="dots pointer-events-none absolute inset-0" aria-hidden />
 
       <header className="relative flex items-center justify-between">
-        <h1 className="text-3xl font-extrabold tracking-tighter uppercase">Ruckus</h1>
+        <h1 className="text-[length:var(--text-title)] font-extrabold tracking-tighter uppercase">Ruckus</h1>
         <Sticker tone="pink" tilt={2}>
           {players.length === 0 ? 'waiting' : `${players.length} in`}
         </Sticker>
       </header>
 
-      <div className="relative flex min-h-0 flex-col items-center justify-center gap-5 overflow-y-auto">
-        <div className="flex items-center gap-8">
-          <Slab tone="chalk" className="px-8 py-4" tilt={-1.5}>
-            <p className="text-center font-mono text-xs font-bold tracking-[0.25em] uppercase opacity-55">
+      {/*
+       * Every row below has a FIXED height. Switching games swaps what is
+       * inside the options row and nothing else moves: an earlier version
+       * resized the room code and the QR depending on the selected game, so
+       * the whole screen jumped every time somebody changed their mind.
+       */}
+      <div className="relative grid min-h-0 grid-rows-[auto_var(--row-players)_var(--row-tiles)_var(--row-options)] content-center items-center justify-items-center gap-5">
+        <div className="flex items-center gap-6">
+          <Slab tone="chalk" className="px-8 py-3" tilt={-1.5}>
+            <p className="text-center font-mono text-[length:var(--text-micro)] font-bold tracking-[0.25em] uppercase opacity-55">
               go to {hostName || 'ruckus'}
             </p>
             <p
               data-room-code={code ?? ''}
-              className={`text-center font-mono font-bold tracking-[0.15em] tabular-nums ${
-                hasSetupPanel ? 'text-[clamp(2.5rem,6vw,4rem)]' : 'text-[clamp(3.5rem,9vw,7rem)]'
-              }`}
+              className="text-center font-mono text-[length:var(--text-mega)] leading-[1.05] font-bold tracking-[0.12em] tabular-nums"
             >
               {code ?? '••••'}
             </p>
           </Slab>
-          {joinUrl && (
-            <Slab tone="chalk" className="p-2" tilt={2.5}>
-              <QrCode value={joinUrl} size={hasSetupPanel ? 104 : 156} />
-            </Slab>
-          )}
+          <Slab tone="chalk" className="p-2" tilt={2.5}>
+            {joinUrl ? (
+              <QrCode value={joinUrl} size={QR_PX} />
+            ) : (
+              <div style={{ width: QR_PX, height: QR_PX }} />
+            )}
+          </Slab>
         </div>
 
-        <div className="flex min-h-24 flex-wrap items-center justify-center gap-4">
+        <div className="flex w-full items-center justify-center gap-4 overflow-hidden">
           {players.map((player, i) => (
             <div key={player.id} className="rise" style={{ animationDelay: `${i * 55}ms` }}>
               <Face name={player.name} color={player.color} size="lg" dim={!player.connected} />
             </div>
           ))}
           {players.length === 0 && (
-            <p className="font-mono text-lg font-bold lowercase opacity-45">
+            <p className="font-mono text-[length:var(--text-body)] font-bold lowercase opacity-45">
               nobody yet. type the code on your phone.
             </p>
           )}
@@ -308,56 +314,73 @@ export default function HostPage() {
               <button
                 key={id}
                 onClick={() => setPick(id)}
-                className="slab press-sm w-60 px-5 py-4 text-left transition-transform"
+                aria-pressed={active}
+                className="slab press-sm flex h-[var(--row-tiles)] w-[15.5rem] flex-col justify-center px-5 py-3 text-left transition-transform"
                 style={{
                   backgroundColor: active ? `var(--color-${GAME_TONES[id]})` : 'var(--color-chalk)',
-                  transform: active ? 'rotate(-1.5deg) scale(1.03)' : `rotate(${i % 2 ? 1 : -1}deg)`,
+                  transform: active ? 'rotate(-1.5deg) scale(1.04)' : `rotate(${i % 2 ? 1 : -1}deg)`,
+                  opacity: active ? 1 : 0.85,
                 }}
               >
-                <span className="block text-xl font-extrabold uppercase">{g.name}</span>
-                <span className="mt-1 block text-sm leading-tight font-semibold opacity-65">{g.tagline}</span>
+                <span className="line-clamp-2 block text-[length:var(--text-lead)] leading-[1.05] font-extrabold uppercase">
+                  {g.name}
+                </span>
+                <span className="mt-1 line-clamp-2 block text-[length:var(--text-label)] leading-snug font-semibold opacity-65">
+                  {g.tagline}
+                </span>
               </button>
             )
           })}
         </div>
 
-        {pick === 'hearsay' && (
-          <div className="flex items-center gap-2">
-            <span className="font-mono text-xs font-bold tracking-widest uppercase opacity-50">how mean</span>
-            {(['mild', 'spicy'] as const).map((option) => (
-              <Button
-                key={option}
-                size="sm"
-                tone={option === 'spicy' ? 'red' : 'chalk'}
-                selected={tone === option}
-                onClick={() => {
-                  setTone(option)
-                  setHearsayTone(option)
-                }}
-              >
-                {option}
-              </Button>
-            ))}
-          </div>
-        )}
+        {/* Fixed height, so what is inside can change without anything moving. */}
+        <div className="flex h-[var(--row-options)] w-full items-center justify-center overflow-y-auto">
+          {pick === 'hearsay' && (
+            <div className="flex items-center gap-3">
+              <span className="font-mono text-[length:var(--text-micro)] font-bold tracking-widest uppercase opacity-50">
+                how mean
+              </span>
+              {(['mild', 'spicy'] as const).map((option) => (
+                <Button
+                  key={option}
+                  size="sm"
+                  tone={option === 'spicy' ? 'red' : 'chalk'}
+                  selected={tone === option}
+                  onClick={() => {
+                    setTone(option)
+                    setHearsayTone(option)
+                  }}
+                >
+                  {option}
+                </Button>
+              ))}
+            </div>
+          )}
 
-        {pick === 'whosaidit' && <WhoSaidItLobbySetup players={players} />}
+          {pick === 'whosaidit' && <WhoSaidItLobbySetup players={players} />}
+
+          {pick === 'telephone' && (
+            <p className="max-w-md text-center font-mono text-[length:var(--text-label)] font-bold lowercase opacity-55">
+              everyone writes, a machine draws it, the next person guesses what you wrote.
+            </p>
+          )}
+        </div>
       </div>
 
       <div className="relative flex items-center justify-center gap-4">
         <button
           onClick={newRoom}
-          className="font-mono text-xs font-bold tracking-widest uppercase underline decoration-2 underline-offset-4 opacity-45 transition-opacity hover:opacity-90"
+          className="font-mono text-[length:var(--text-micro)] font-bold tracking-widest uppercase underline decoration-2 underline-offset-4 opacity-45 transition-opacity hover:opacity-90"
         >
           New room
         </button>
-        <div className="flex flex-col items-center gap-1.5">
+        <div className="flex h-[4.8rem] flex-col items-center justify-center gap-1">
           <Button disabled={!canStart} onClick={() => runtime.current?.start(selected)} size="lg" tone="pink">
             Start {selected.name}
           </Button>
-          {!canStart && (
-            <p className="max-w-md text-center font-mono text-xs font-bold lowercase opacity-60">{blockedReason}</p>
-          )}
+          <p className="h-4 text-center font-mono text-[length:var(--text-micro)] font-bold lowercase opacity-60">
+            {canStart ? '' : blockedReason}
+          </p>
         </div>
       </div>
     </main>

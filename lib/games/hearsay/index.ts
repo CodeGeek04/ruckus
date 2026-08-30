@@ -19,7 +19,7 @@ export function setHearsayTone(tone: 'mild' | 'spicy') {
 export const hearsay: GameModule<HearsayState, HearsayInput, HearsayHostView, HearsayPlayerView> = {
   id: 'hearsay',
   name: 'Hearsay',
-  tagline: 'The room testifies about you. You never hear the charge.',
+  tagline: 'You never hear the question.',
   minPlayers: 4,
   maxPlayers: 12,
   init: (players) => {

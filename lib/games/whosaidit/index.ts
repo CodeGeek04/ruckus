@@ -30,7 +30,7 @@ export const whosaidit: GameModule<
 > = {
   id: 'whosaidit',
   name: 'Who Said It',
-  tagline: 'Real messages from your own chat. Everyone guesses who typed it.',
+  tagline: 'Real messages. Who sent it?',
   minPlayers: MIN_PLAYERS,
   maxPlayers: MAX_PLAYERS,
   init: (players) => {

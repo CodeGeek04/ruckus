@@ -31,7 +31,7 @@ import {
 export const telephone: GameModule<TelephoneState, TelephoneInput, TelephoneHostView, TelephonePlayerView> = {
   id: 'telephone',
   name: 'Broken Telephone',
-  tagline: 'Write a sentence. Watch a machine ruin it, six people deep.',
+  tagline: 'A machine ruins your sentence.',
   minPlayers: 3,
   maxPlayers: 12,
   init: (players) => ({
