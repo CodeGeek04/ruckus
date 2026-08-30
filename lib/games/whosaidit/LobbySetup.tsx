@@ -11,6 +11,7 @@ import {
   subscribeWhoSaidItSource,
   whoSaidItStatus,
 } from './source'
+import type { AuthorEntry } from './state'
 
 /** Authors quieter than this are not worth a row: they cannot carry a round. */
 const MIN_AUTHOR_MESSAGES = 3
@@ -27,40 +28,59 @@ function suggest(author: string, players: Player[], taken: Set<PlayerId>): Playe
   return match?.id ?? null
 }
 
-function autoMap(stats: AuthorStat[], players: Player[]): Record<string, PlayerId | null> {
-  const mapping: Record<string, PlayerId | null> = {}
+/**
+ * Everybody in the chat is an answer by default, whether or not they came to
+ * play. The link to a lobby player is a courtesy: it stops that person being
+ * asked to guess their own message, and nothing else.
+ */
+export function autoAuthors(stats: AuthorStat[], players: Player[]): Record<string, AuthorEntry> {
+  const authors: Record<string, AuthorEntry> = {}
   const taken = new Set<PlayerId>()
   for (const stat of stats) {
     const guess = suggest(stat.author, players, taken)
     if (guess) taken.add(guess)
-    mapping[stat.author] = guess
+    authors[stat.author] = { included: true, playerId: guess }
   }
-  return mapping
+  return authors
 }
 
-function MessageRow({
+function AuthorRow({
   stat,
   players,
-  value,
+  entry,
   onChange,
 }: {
   stat: AuthorStat
   players: Player[]
-  value: PlayerId | null
-  onChange: (playerId: PlayerId | null) => void
+  entry: AuthorEntry
+  onChange: (entry: AuthorEntry) => void
 }) {
   return (
     <div className="flex items-center justify-between gap-4 py-1">
-      <span className="min-w-0 flex-1 truncate text-lg font-black text-white">{stat.author}</span>
+      <button
+        onClick={() => onChange({ ...entry, included: !entry.included })}
+        className={`h-7 w-7 shrink-0 rounded-lg border-2 text-sm font-black ${
+          entry.included ? 'border-green-400 bg-green-400 text-black' : 'border-white/20 text-transparent'
+        }`}
+        aria-label={entry.included ? `Exclude ${stat.author}` : `Include ${stat.author}`}
+      >
+        Y
+      </button>
+      <span
+        className={`min-w-0 flex-1 truncate text-lg font-black ${entry.included ? 'text-white' : 'text-white/30'}`}
+      >
+        {stat.author}
+      </span>
       <span className="w-28 text-right text-sm font-bold tabular-nums text-white/40">
         {stat.usable} of {stat.total}
       </span>
       <select
-        value={value ?? ''}
-        onChange={(event) => onChange(event.target.value || null)}
+        value={entry.playerId ?? ''}
+        onChange={(event) => onChange({ ...entry, playerId: event.target.value || null })}
         className="w-44 rounded-lg border-2 border-white/20 bg-black px-3 py-2 text-base font-bold text-white"
+        aria-label={`Which player is ${stat.author}`}
       >
-        <option value="">Ignore</option>
+        <option value="">Not playing</option>
         {players.map((player) => (
           <option key={player.id} value={player.id}>
             {player.name}
@@ -91,7 +111,12 @@ export function WhoSaidItLobbySetup({ players }: { players: Player[] }) {
           setError('No messages found. Export the chat from WhatsApp without media and upload the .txt.')
           return
         }
-        setWhoSaidItSource({ messages, mapping: autoMap(authorStats(messages), players) })
+        // Filter on usable, not total: an author with 40 messages that are all
+        // "ok" and attachments has nothing to serve, and the group's own system
+        // author ("Hackerhouse v2.0.0") shows up with messages but zero usable
+        // ones. Those never become rows, and never become answers.
+        const stats = authorStats(messages).filter((s) => s.usable >= MIN_AUTHOR_MESSAGES)
+        setWhoSaidItSource({ messages, authors: autoAuthors(stats, players) })
       } catch {
         setError('Could not read that file.')
       }
@@ -119,25 +144,25 @@ export function WhoSaidItLobbySetup({ players }: { players: Player[] }) {
     )
   }
 
-  // Filter on usable, not total: an author with 40 messages that are all "ok"
-  // and attachments has nothing to serve, and the group's own system author
-  // ("Hackerhouse v2.0.0") shows up with messages but zero usable ones.
   const stats = authorStats(source.messages).filter((s) => s.usable >= MIN_AUTHOR_MESSAGES)
   const status = whoSaidItStatus(players)
 
   return (
     <div className="flex w-full max-w-3xl flex-col items-center gap-3">
+      <p className="text-sm font-bold uppercase tracking-widest text-white/30">
+        Everyone in the chat is an answer. Say who is in the room so they skip their own lines.
+      </p>
       <div className="max-h-52 w-full overflow-y-auto rounded-2xl border-2 border-white/10 px-4 py-2">
         {stats.map((stat) => (
-          <MessageRow
+          <AuthorRow
             key={stat.author}
             stat={stat}
             players={players}
-            value={source.mapping[stat.author] ?? null}
-            onChange={(playerId) =>
+            entry={source.authors[stat.author] ?? { included: true, playerId: null }}
+            onChange={(entry) =>
               setWhoSaidItSource({
                 messages: source.messages,
-                mapping: { ...source.mapping, [stat.author]: playerId },
+                authors: { ...source.authors, [stat.author]: entry },
               })
             }
           />

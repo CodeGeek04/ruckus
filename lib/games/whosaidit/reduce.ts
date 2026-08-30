@@ -3,6 +3,7 @@ import type { Command, GameEvent, Player, PlayerId, Reduced } from '@/lib/types'
 import { chooseRoundMessages } from './parse'
 import {
   DEFAULT_CONFIG,
+  type AuthorKey,
   type ChatSource,
   type Phase,
   type Round,
@@ -14,9 +15,9 @@ import {
 /** +500 for a correct guess. That is the whole scoring model. */
 export function scoreRound(round: Round, config: WhoSaidItConfig): Record<PlayerId, number> {
   const awarded: Record<PlayerId, number> = {}
-  for (const [guesserId, targetId] of Object.entries(round.guesses)) {
-    if (guesserId === round.authorId) continue
-    if (targetId === round.authorId) awarded[guesserId] = config.scoring.correctGuess
+  for (const [guesserId, target] of Object.entries(round.guesses)) {
+    if (guesserId === round.authorPlayerId) continue
+    if (target === round.author) awarded[guesserId] = config.scoring.correctGuess
   }
   return awarded
 }
@@ -29,18 +30,18 @@ export function scoreRound(round: Round, config: WhoSaidItConfig): Record<Player
 export function mostFooledBy(
   round: Round,
   config: WhoSaidItConfig
-): { playerIds: PlayerId[]; count: number } | null {
-  const counts = new Map<PlayerId, number>()
-  for (const [guesserId, targetId] of Object.entries(round.guesses)) {
-    if (guesserId === round.authorId) continue
-    if (targetId === round.authorId) continue
-    counts.set(targetId, (counts.get(targetId) ?? 0) + 1)
+): { authors: AuthorKey[]; count: number } | null {
+  const counts = new Map<AuthorKey, number>()
+  for (const [guesserId, target] of Object.entries(round.guesses)) {
+    if (guesserId === round.authorPlayerId) continue
+    if (target === round.author) continue
+    counts.set(target, (counts.get(target) ?? 0) + 1)
   }
   if (counts.size === 0) return null
 
   const count = Math.max(...counts.values())
   if (count < config.mostFooledMinVotes) return null
-  return { playerIds: [...counts.entries()].filter(([, n]) => n === count).map(([id]) => id), count }
+  return { authors: [...counts.entries()].filter(([, n]) => n === count).map(([a]) => a), count }
 }
 
 /**
@@ -53,35 +54,43 @@ export function buildRounds(
   players: readonly Player[],
   source: ChatSource,
   config: WhoSaidItConfig
-): { rounds: Round[]; problem: string | null } {
+): { rounds: Round[]; links: Record<AuthorKey, PlayerId>; problem: string | null } {
   const playerIds = new Set(players.map((p) => p.id))
 
-  // Author name -> player id, keeping only mappings that point at somebody
-  // still in the lobby. A player who left between the upload and the start
-  // must not become an unanswerable option.
-  const mapped = new Map<string, PlayerId>()
-  for (const [author, playerId] of Object.entries(source.mapping)) {
-    if (playerId && playerIds.has(playerId)) mapped.set(author, playerId)
+  // Candidates are chat authors, in the order the lobby lists them, whether or
+  // not they turned up to play. Guessing somebody who is not in the room is the
+  // point: the whole group chat is fair game.
+  const candidates = Object.entries(source.authors)
+    .filter(([, entry]) => entry?.included)
+    .map(([author]) => author)
+
+  // A link to somebody who left the lobby between the upload and the start is
+  // dropped: it would silence a player who is no longer there.
+  const linked = new Map<AuthorKey, PlayerId>()
+  for (const author of candidates) {
+    const playerId = source.authors[author].playerId
+    if (playerId && playerIds.has(playerId)) linked.set(author, playerId)
   }
 
-  // Lobby order, so the candidate list on every phone matches the lobby.
-  const candidateIds = players.map((p) => p.id).filter((id) => [...mapped.values()].includes(id))
+  const links = Object.fromEntries(linked)
 
-  if (candidateIds.length < MIN_CANDIDATES) {
+  if (candidates.length < MIN_CANDIDATES) {
     return {
       rounds: [],
-      problem: `Map at least three chat authors to players. Right now only ${candidateIds.length} would be on screen, so there is nothing to guess.`,
+      links,
+      problem: `Include at least three chat authors. Right now only ${candidates.length} would be on screen, so there is nothing to guess.`,
     }
   }
 
   const picked = chooseRoundMessages(source.messages, {
-    authors: [...mapped.keys()],
+    authors: candidates,
     count: config.rounds,
   })
 
   if (picked.length === 0) {
     return {
       rounds: [],
+      links,
       problem: 'No usable messages in that export. Everything was too short, a reaction, a link, or gave the answer away by naming somebody.',
     }
   }
@@ -89,11 +98,13 @@ export function buildRounds(
   return {
     rounds: picked.map((message) => ({
       text: message.text,
-      authorId: mapped.get(message.author)!,
-      candidateIds,
+      author: message.author,
+      authorPlayerId: linked.get(message.author) ?? null,
+      candidates,
       guesses: {},
       awarded: {},
     })),
+    links,
     problem: null,
   }
 }
@@ -103,7 +114,7 @@ export function initWhoSaidIt(
   source: ChatSource,
   config: WhoSaidItConfig = DEFAULT_CONFIG
 ): WhoSaidItState {
-  const { rounds, problem } = buildRounds(players, source, config)
+  const { rounds, links, problem } = buildRounds(players, source, config)
   const scores: Record<PlayerId, number> = {}
   for (const p of players) scores[p.id] = 0
 
@@ -113,6 +124,7 @@ export function initWhoSaidIt(
     config,
     roundIndex: 0,
     rounds,
+    links,
     scores,
     problem,
   }
@@ -180,14 +192,14 @@ function applyInput(
   const round = state.rounds[state.roundIndex]
   if (!round) return { state }
   // You wrote it, so you are never asked, and you can never stall the round.
-  if (playerId === round.authorId) return { state }
-  if (!round.candidateIds.includes(input.targetId)) return { state }
+  if (playerId === round.authorPlayerId) return { state }
+  if (!round.candidates.includes(input.target)) return { state }
 
-  const guesses = { ...round.guesses, [playerId]: input.targetId }
+  const guesses = { ...round.guesses, [playerId]: input.target }
   const updated = withRound(state, { ...round, guesses })
 
   const everyoneGuessed = state.players
-    .filter((p) => p.id !== round.authorId)
+    .filter((p) => p.id !== round.authorPlayerId)
     .every((p) => guesses[p.id] !== undefined)
 
   return everyoneGuessed ? enterReveal(updated) : { state: updated }

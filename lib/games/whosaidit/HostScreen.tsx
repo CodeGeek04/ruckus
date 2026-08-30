@@ -1,7 +1,6 @@
 'use client'
 
 import { PlayerChip } from '@/components/PlayerChip'
-import type { Player } from '@/lib/types'
 import type { WhoSaidItHostView } from './views'
 
 /** Long messages have to shrink rather than push the screen off the bottom. */
@@ -21,11 +20,11 @@ function Quote({ text, dim = false }: { text: string; dim?: boolean }) {
   )
 }
 
-function GuessColumn({ player, view }: { player: Player; view: WhoSaidItHostView }) {
+function GuessColumn({ author, view }: { author: string; view: WhoSaidItHostView }) {
   const voters = view.guesses
-    ? Object.entries(view.guesses).filter(([, target]) => target === player.id).map(([id]) => id)
+    ? Object.entries(view.guesses).filter(([, target]) => target === author).map(([id]) => id)
     : []
-  const isAuthor = view.authorId === player.id
+  const isAuthor = view.author === author
 
   return (
     <div
@@ -33,7 +32,7 @@ function GuessColumn({ player, view }: { player: Player; view: WhoSaidItHostView
         isAuthor ? 'bg-green-400/20 ring-4 ring-green-400' : ''
       }`}
     >
-      <PlayerChip player={player} size="sm" />
+      <span className="max-w-32 truncate text-xl font-black text-white">{author}</span>
       <div className="flex h-5 flex-wrap justify-center gap-1">
         {voters.map((voterId) => {
           const voter = view.players.find((p) => p.id === voterId)
@@ -46,13 +45,8 @@ function GuessColumn({ player, view }: { player: Player; view: WhoSaidItHostView
 }
 
 export function WhoSaidItHostScreen({ view }: { view: WhoSaidItHostView }) {
-  const fooled = view.mostFooled
-    ? view.mostFooled.playerIds
-        .map((id) => view.players.find((p) => p.id === id)?.name)
-        .filter(Boolean)
-        .join(' and ')
-    : null
-  const authorName = view.players.find((p) => p.id === view.authorId)?.name ?? null
+  const fooled = view.mostFooled ? view.mostFooled.authors.join(' and ') : null
+  const authorName = view.author
 
   return (
     <div className="flex h-full flex-col justify-between overflow-hidden p-10">
@@ -88,8 +82,8 @@ export function WhoSaidItHostScreen({ view }: { view: WhoSaidItHostView }) {
             <Quote text={view.message} dim />
             <p className="text-7xl font-black uppercase text-green-400">{authorName} said it</p>
             <div className="flex flex-wrap items-start justify-center gap-4">
-              {view.candidates.map((player) => (
-                <GuessColumn key={player.id} player={player} view={view} />
+              {view.candidates.map((author) => (
+                <GuessColumn key={author} author={author} view={view} />
               ))}
             </div>
             {fooled && (

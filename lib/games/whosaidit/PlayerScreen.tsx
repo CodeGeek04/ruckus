@@ -47,16 +47,13 @@ export function WhoSaidItPlayerScreen({
         <Quote text={view.message} />
         <p className="text-sm font-black uppercase tracking-widest text-white/40">Who said it?</p>
         <div className="flex flex-col gap-3 pb-6">
-          {view.candidates.map((player) => (
+          {view.candidates.map((author) => (
             <BigButton
-              key={player.id}
-              selected={view.myGuess === player.id}
-              onClick={() => send({ kind: 'guess', targetId: player.id })}
+              key={author}
+              selected={view.myGuess === author}
+              onClick={() => send({ kind: 'guess', target: author })}
             >
-              <span className="flex items-center gap-3">
-                <span className="h-6 w-6 rounded-full" style={{ backgroundColor: player.color }} />
-                {player.name}
-              </span>
+              {author}
             </BigButton>
           ))}
         </div>

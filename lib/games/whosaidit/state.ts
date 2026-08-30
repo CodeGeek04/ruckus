@@ -4,16 +4,29 @@ import type { ChatMessage } from './parse'
 
 export type Phase = 'message' | 'reveal' | 'scoreboard' | 'ended'
 
-export type WhoSaidItInput = { kind: 'guess'; targetId: PlayerId }
+/**
+ * A chat author, identified by the name WhatsApp exported. Authors are the
+ * answers now, so this is the key that travels through state, views and inputs.
+ * Most of them never join the game.
+ */
+export type AuthorKey = string
+
+export type WhoSaidItInput = { kind: 'guess'; target: AuthorKey }
 
 export type Round = {
   /** The real message, verbatim. Public: it goes on the shared screen. */
   text: string
-  /** The lobby player the chat author was mapped to. Secret until the reveal. */
-  authorId: PlayerId
+  /** The chat author who wrote it. Secret until the reveal. */
+  author: AuthorKey
+  /**
+   * The lobby player that author was linked to, when there is one. Its only
+   * job is to let that person sit the round out. Null when the author is not
+   * in the room, which is the common case.
+   */
+  authorPlayerId: PlayerId | null
   /** Who could have sent it. The real author is always among them. */
-  candidateIds: PlayerId[]
-  guesses: Record<PlayerId, PlayerId>
+  candidates: AuthorKey[]
+  guesses: Record<PlayerId, AuthorKey>
   /** Points for this round, filled in when entering the reveal. */
   awarded: Record<PlayerId, number>
 }
@@ -47,6 +60,11 @@ export type WhoSaidItState = {
   config: WhoSaidItConfig
   roundIndex: number
   rounds: Round[]
+  /**
+   * Chat author -> the lobby player they are, for the authors the host linked.
+   * Never public: it would name the answer before the reveal.
+   */
+  links: Record<AuthorKey, PlayerId>
   scores: Record<PlayerId, number>
   /**
    * Why there is no game, when there is no game. Set when the host started
@@ -62,18 +80,28 @@ export function currentRound(state: WhoSaidItState): Round | null {
 
 /**
  * Everyone except the person who actually wrote it. You are never asked to
- * guess your own message, so you are never the reason a round stalls.
+ * guess your own message, so you are never the reason a round stalls. When the
+ * author never joined the game, nobody sits out.
  */
 export function guessers(state: WhoSaidItState, round: Round): Player[] {
-  return state.players.filter((p) => p.id !== round.authorId)
+  return state.players.filter((p) => p.id !== round.authorPlayerId)
 }
 
 /**
- * What the lobby hands the game: the parsed chat plus a decision, per chat
- * author, about which lobby player they are. `null` means ignore them.
+ * What the lobby decided about one chat author: whether they are on the answer
+ * board at all, and which lobby player they are, if any. The link is optional
+ * and buys exactly one thing: that player skips their own messages.
+ */
+export type AuthorEntry = {
+  included: boolean
+  playerId: PlayerId | null
+}
+
+/**
+ * What the lobby hands the game: the parsed chat plus a decision per author.
  * This never crosses the wire; it lives in the host tab only.
  */
 export type ChatSource = {
   messages: ChatMessage[]
-  mapping: Record<string, PlayerId | null>
+  authors: Record<AuthorKey, AuthorEntry>
 }

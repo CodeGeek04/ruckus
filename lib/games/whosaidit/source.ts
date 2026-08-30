@@ -2,14 +2,14 @@
 //
 // The imported chat, held in the host tab. Separate from index.ts so the lobby
 // setup component can reach it without importing the module that renders it.
-import type { Player } from '@/lib/types'
+import type { Player, PlayerId } from '@/lib/types'
 import { buildRounds } from './reduce'
-import { DEFAULT_CONFIG, type ChatSource } from './state'
+import { DEFAULT_CONFIG, type AuthorEntry, type ChatSource } from './state'
 
 export const MIN_PLAYERS = 3
 export const MAX_PLAYERS = 12
 
-const EMPTY: ChatSource = { messages: [], mapping: {} }
+const EMPTY: ChatSource = { messages: [], authors: {} }
 
 /**
  * A module level value rather than an init argument, because the GameModule
@@ -24,13 +24,51 @@ const listeners = new Set<() => void>()
 /** Same tab, same browser. Survives a host refresh, exactly like the snapshot. */
 const SOURCE_KEY = 'ruckus:whosaidit:chat'
 
+/** The shape this file stored before chat authors became the answers. */
+type LegacySource = { messages?: unknown; mapping?: Record<string, PlayerId | null> }
+
+/**
+ * A host can still have last session's value in storage, which held a mapping
+ * of author to player and nothing about inclusion. Rather than crashing on it,
+ * it is read as: the authors the host linked are in, the ones they marked
+ * "Ignore" stay out. They can toggle from there.
+ */
+function migrate(mapping: Record<string, PlayerId | null>): Record<string, AuthorEntry> {
+  const authors: Record<string, AuthorEntry> = {}
+  for (const [author, playerId] of Object.entries(mapping)) {
+    authors[author] = { included: Boolean(playerId), playerId: playerId ?? null }
+  }
+  return authors
+}
+
+function readEntries(value: unknown): Record<string, AuthorEntry> | null {
+  if (!value || typeof value !== 'object') return null
+  const authors: Record<string, AuthorEntry> = {}
+  for (const [author, entry] of Object.entries(value as Record<string, unknown>)) {
+    if (!entry || typeof entry !== 'object') return null
+    const { included, playerId } = entry as Partial<AuthorEntry>
+    if (typeof included !== 'boolean') return null
+    authors[author] = { included, playerId: typeof playerId === 'string' ? playerId : null }
+  }
+  return authors
+}
+
+export function readStoredSource(raw: string | null): ChatSource | null {
+  try {
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as (Partial<ChatSource> & LegacySource) | null
+    if (!parsed || !Array.isArray(parsed.messages)) return null
+    const authors = readEntries(parsed.authors) ?? (parsed.mapping ? migrate(parsed.mapping) : null)
+    if (!authors) return null
+    return { messages: parsed.messages, authors }
+  } catch {
+    return null
+  }
+}
+
 function readStored(): ChatSource | null {
   try {
-    const raw = localStorage.getItem(SOURCE_KEY)
-    if (!raw) return null
-    const parsed = JSON.parse(raw) as ChatSource
-    if (!parsed || !Array.isArray(parsed.messages) || !parsed.mapping) return null
-    return { messages: parsed.messages, mapping: parsed.mapping }
+    return readStoredSource(localStorage.getItem(SOURCE_KEY))
   } catch {
     return null
   }
