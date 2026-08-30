@@ -23,8 +23,13 @@ const fail = (m) => {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
-/** Nothing may overflow the viewport: the host screen is a fixed TV, not a scroll. */
-async function checkLayout(page, label) {
+/**
+ * A game screen is a fixed frame and must never overflow: nobody scrolls a TV
+ * mid round. The lobby is allowed to scroll, because ten chat authors genuinely
+ * do not fit a short laptop and clipping them hid rows people had to tick.
+ * Horizontal overflow is always wrong, and so is anything unreachable.
+ */
+async function checkLayout(page, label, { allowScroll = false } = {}) {
   const overflow = await page.evaluate(() => {
     const d = document.documentElement
     return {
@@ -37,12 +42,12 @@ async function checkLayout(page, label) {
   if (overflow.scrollW > overflow.clientW + 1) {
     fail(`${label}: horizontal overflow, ${overflow.scrollW}px content in ${overflow.clientW}px viewport`)
   }
-  if (overflow.scrollH > overflow.clientH + 1) {
+  if (!allowScroll && overflow.scrollH > overflow.clientH + 1) {
     fail(`${label}: vertical overflow, ${overflow.scrollH}px content in ${overflow.clientH}px viewport`)
   }
 
   // Anything rendered outside the viewport box is invisible on a TV.
-  const clipped = await page.evaluate(() => {
+  const clipped = await page.evaluate((allowScroll) => {
     const out = []
     const inScroller = (el) => {
       for (let p = el.parentElement; p; p = p.parentElement) {
@@ -55,12 +60,15 @@ async function checkLayout(page, label) {
       const r = el.getBoundingClientRect()
       if (r.width === 0 || r.height === 0) continue
       if (inScroller(el)) continue
-      if (r.bottom > window.innerHeight + 1 || r.right > window.innerWidth + 1 || r.top < -1 || r.left < -1) {
+      // When the page may scroll, "below the fold" is fine; off the document
+      // to the side, or above the top, still is not.
+      const belowFold = r.bottom > window.innerHeight + 1
+      if ((belowFold && !allowScroll) || r.right > window.innerWidth + 1 || r.top < -1 || r.left < -1) {
         out.push(`${el.tagName}.${el.className.toString().slice(0, 30)} "${(el.textContent ?? '').trim().slice(0, 40)}"`)
       }
     }
     return out.slice(0, 5)
-  })
+  }, allowScroll)
   for (const c of clipped) fail(`${label}: element outside viewport: ${c}`)
 }
 
@@ -95,7 +103,7 @@ async function main() {
     return report()
   }
   note(`room code ${code}`)
-  await checkLayout(host, 'host lobby')
+  await checkLayout(host, 'host lobby', { allowScroll: true })
   await shot(host, '01-host-lobby-empty')
 
   // Each phone is its own context so localStorage identities do not collide.
@@ -116,7 +124,7 @@ async function main() {
   await sleep(2500)
   const chips = await host.locator('div.grid.place-items-center').count()
   if (chips < NAMES.length) fail(`lobby shows ${chips} players, expected ${NAMES.length}`)
-  await checkLayout(host, 'host lobby full')
+  await checkLayout(host, 'host lobby full', { allowScroll: true })
   await shot(host, '02-host-lobby-full')
   await shot(phones[0].page, '03-phone-waiting')
 
@@ -137,7 +145,7 @@ async function main() {
         await file.setInputFiles(EXPORT)
         await sleep(2500)
         note('chat export loaded')
-        await checkLayout(host, 'whosaidit lobby')
+        await checkLayout(host, 'whosaidit lobby', { allowScroll: true })
         await shot(host, '04-whosaidit-lobby')
       }
     }

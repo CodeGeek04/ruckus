@@ -192,7 +192,7 @@ export function WhoSaidItLobbySetup({ players }: { players: Player[] }) {
           button off the bottom at 720p. */}
       <Slab tone="paper" className="w-full p-1.5">
         <div
-          className={`grid max-h-[min(7rem,10vh)] gap-1.5 overflow-y-auto ${
+          className={`grid max-h-[min(22rem,44vh)] gap-1.5 overflow-y-auto ${
             stats.length > 4 ? 'grid-cols-2' : 'grid-cols-1'
           }`}
         >
@@ -214,8 +214,8 @@ export function WhoSaidItLobbySetup({ players }: { players: Player[] }) {
       </Slab>
 
       <div className="flex flex-wrap items-center justify-center gap-3">
-        <Sticker tone={status.ready ? 'lime' : 'red'} tilt={1.5}>
-          {status.ready ? `${status.rounds} rounds ready` : status.reason}
+        <Sticker tone={status.ready ? 'lime' : 'yellow'} tilt={1.5}>
+          {status.ready ? `${status.rounds} rounds ready` : 'chat loaded'}
         </Sticker>
         <p className="font-mono text-xs font-bold lowercase opacity-60">
           {included} of {stats.length} on the board. tick who counts, say who is in the room.

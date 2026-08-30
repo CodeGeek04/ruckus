@@ -1,6 +1,7 @@
 'use client'
 
 import { Countdown } from '@/components/Countdown'
+import { Button, Field, Slab, Sticker } from '@/components/kit'
 import { GAMES } from '@/lib/games/registry'
 import { createPlayerClient, type PlayerClient } from '@/lib/runtime/playerClient'
 import { viewPhase } from '@/lib/runtime/protocol'
@@ -58,56 +59,98 @@ export default function PlayPage({ params }: { params: Promise<{ code: string }>
 
   if (rejected) {
     return (
-      <main className="flex h-full flex-col items-center justify-center gap-5 p-8 text-center">
-        <p className="text-6xl">⏳</p>
-        <p className="text-4xl font-black uppercase leading-tight text-white">Already started</p>
-        <p className="max-w-xs text-lg font-bold text-white/60">{rejected}</p>
-        <p className="text-sm font-bold uppercase tracking-widest text-white/30">Room {code}</p>
-      </main>
+      <Field hue="orange" pattern="stripes">
+        <main className="flex h-full flex-col items-center justify-center gap-5 p-8 text-center">
+          <p className="text-6xl">⏳</p>
+          <h1 className="text-[length:var(--text-title)] leading-[1.05] font-extrabold uppercase">
+            Already started
+          </h1>
+          <Slab tone="chalk" className="max-w-xs px-5 py-4" tilt={-1}>
+            <p className="text-[length:var(--text-body)] font-bold">{rejected}</p>
+          </Slab>
+          <Sticker tone="chalk" tilt={2}>room {code}</Sticker>
+        </main>
+      </Field>
     )
   }
 
   if (!me) {
+    const ready = cleanName(name).length > 0 && status === 'open'
     return (
-      <main className="flex h-full flex-col justify-center gap-5 p-6">
-        <p className="text-center font-mono text-4xl font-black tracking-widest text-white/50">{code}</p>
-        <input
-          value={name}
-          onChange={(e) => setName(truncateName(e.target.value))}
-          placeholder="Your name"
-          className="rounded-2xl border-4 border-white/30 bg-white/5 px-5 py-6 text-center text-3xl font-black"
-        />
-        <button
-          disabled={cleanName(name).length === 0 || status !== 'open'}
-          onClick={() => client.current?.join(cleanName(name))}
-          className="rounded-2xl bg-white py-6 text-3xl font-black uppercase text-black disabled:opacity-30"
-        >
-          {status === 'open' ? 'Join' : 'Connecting...'}
-        </button>
-      </main>
+      <Field hue="yellow">
+        <main className="flex h-full flex-col justify-center gap-5 p-6">
+          <div className="flex flex-col items-center gap-2">
+            <Sticker tone="pink" tilt={-3}>joining</Sticker>
+            <p className="text-center font-mono text-[length:var(--text-hero)] leading-none font-bold tracking-[0.15em]">
+              {code}
+            </p>
+          </div>
+
+          <form
+            className="flex flex-col gap-4"
+            onSubmit={(e) => {
+              e.preventDefault()
+              if (ready) client.current?.join(cleanName(name))
+            }}
+          >
+            <input
+              value={name}
+              onChange={(e) => setName(truncateName(e.target.value))}
+              placeholder="Your name"
+              aria-label="Your name"
+              autoComplete="off"
+              className="slab w-full bg-[var(--color-chalk)] px-5 py-6 text-center text-3xl font-extrabold outline-none placeholder:opacity-30"
+            />
+            <Button disabled={!ready} size="lg" tone="pink" className="w-full">
+              {status === 'open' ? 'Join' : 'Connecting'}
+            </Button>
+          </form>
+
+          <p className="text-center font-mono text-[length:var(--text-micro)] font-bold lowercase opacity-55">
+            {status === 'open' ? 'then watch the big screen' : 'finding the room'}
+          </p>
+        </main>
+      </Field>
     )
   }
 
   if (hostStatus === 'gone') {
     return (
-      <main className="flex h-full flex-col items-center justify-center gap-5 p-8 text-center">
-        <p className="text-6xl">📺</p>
-        <p className="text-4xl font-black uppercase leading-tight text-white">Lost the host</p>
-        <p className="max-w-xs text-lg font-bold text-white/60">
-          The big screen stopped responding. If someone closed the tab or the wifi dropped, this will
-          reconnect on its own the moment it is back.
-        </p>
-        <p className="text-sm font-bold uppercase tracking-widest text-white/30">Room {code}</p>
-      </main>
+      <Field hue="red" pattern="stripes">
+        <main className="flex h-full flex-col items-center justify-center gap-5 p-8 text-center">
+          <p className="text-6xl">📺</p>
+          <h1 className="text-[length:var(--text-title)] leading-[1.05] font-extrabold uppercase">
+            Lost the host
+          </h1>
+          <Slab tone="chalk" className="max-w-xs px-5 py-4" tilt={1}>
+            <p className="text-[length:var(--text-body)] font-bold">
+              The big screen stopped responding. This reconnects on its own the moment it is back.
+            </p>
+          </Slab>
+          <Sticker tone="chalk" tilt={-2}>room {code}</Sticker>
+        </main>
+      </Field>
     )
   }
 
   if (!view) {
     return (
-      <main className="flex h-full flex-col items-center justify-center gap-4 p-8 text-center">
-        <p className="text-4xl font-black uppercase">You&apos;re in</p>
-        <p className="text-xl font-bold text-white/50">{lobby.length} in the room. Watch the big screen.</p>
-      </main>
+      <Field hue="mint">
+        <main className="flex h-full flex-col items-center justify-center gap-5 p-8 text-center">
+          <Sticker tone="chalk" tilt={-3}>you are in</Sticker>
+          <h1 className="text-[length:var(--text-hero)] leading-[0.95] font-extrabold uppercase">
+            {me.name}
+          </h1>
+          <Slab tone="chalk" className="px-6 py-4" tilt={1.5}>
+            <p className="text-[length:var(--text-lead)] font-extrabold tabular-nums">
+              {lobby.length} in the room
+            </p>
+            <p className="mt-1 font-mono text-[length:var(--text-micro)] font-bold lowercase opacity-55">
+              watch the big screen
+            </p>
+          </Slab>
+        </main>
+      </Field>
     )
   }
 
@@ -120,8 +163,10 @@ export default function PlayPage({ params }: { params: Promise<{ code: string }>
 
   return (
     <main className="relative h-full">
-      <div className="absolute right-4 top-3 text-2xl font-black">
-        <Countdown deadline={ended ? null : deadline} />
+      <div className="pointer-events-none absolute top-3 right-3 z-20">
+        <Slab tone="chalk" className="px-3 py-0.5" tilt={3}>
+          <Countdown deadline={ended ? null : deadline} className="text-2xl font-extrabold" />
+        </Slab>
       </div>
       <Screen view={view} send={(input: unknown) => client.current?.send(input)} />
     </main>

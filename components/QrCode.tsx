@@ -8,9 +8,9 @@ export function QrCode({ value, size = 220 }: { value: string; size?: number }) 
 
   useEffect(() => {
     if (ref.current) {
-      QRCode.toCanvas(ref.current, value, { width: size, margin: 1, color: { dark: '#000000', light: '#ffffff' } })
+      QRCode.toCanvas(ref.current, value, { width: size, margin: 1, color: { dark: '#17161d', light: '#fdfcf7' } })
     }
   }, [value, size])
 
-  return <canvas ref={ref} className="rounded-xl bg-white p-2" />
+  return <canvas ref={ref} className="rounded-xl bg-[var(--color-chalk)] p-2" />
 }

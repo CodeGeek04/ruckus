@@ -24,8 +24,21 @@ export type AuthorStat = {
 export const MIN_AUTHOR_MESSAGES = 3
 
 export const MIN_LENGTH = 25
-export const MAX_LENGTH = 200
-export const MIN_WORDS = 4
+/**
+ * A poster line, not a paragraph. Anything longer stops being a thing somebody
+ * said and becomes an essay nobody reads off a shared screen, and its sheer
+ * length gives the author away before the words do.
+ */
+export const MAX_LENGTH = 140
+/** Four-word fragments ("Door lock, exhaust, chimney") carry no voice. */
+export const MIN_WORDS = 5
+
+/**
+ * Attachment and file lines that survive parsing as if they were sentences:
+ * "Payment_Receipt_1778083532690.pdf • 2 pages".
+ */
+const FILE_ARTIFACT =
+  /(\.(pdf|docx?|xlsx?|pptx?|csv|zip|apk|mp4|mov|mp3|jpe?g|png|webp|gif|heic)\b|•\s*\d+\s*pages?\b)/i
 
 // `[12/01/24, 9:41:03 PM] Name: message`
 const BRACKET_LINE =
@@ -139,6 +152,7 @@ export function messageQuality(text: string, options: QualityOptions = {}): numb
 
   if (trimmed.length < MIN_LENGTH || trimmed.length > MAX_LENGTH) return 0
   if (words(trimmed).length < MIN_WORDS) return 0
+  if (FILE_ARTIFACT.test(trimmed)) return 0
   if (URL_ANYWHERE.test(trimmed)) return 0
   if (SYMBOLS_ONLY.test(trimmed)) return 0
   if (isReactionOnly(trimmed)) return 0

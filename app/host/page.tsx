@@ -270,7 +270,7 @@ export default function HostPage() {
 
   return (
     <main
-      className="relative grid h-full grid-rows-[auto_minmax(0,1fr)_auto] gap-4 overflow-hidden p-6"
+      className="relative grid min-h-full grid-rows-[auto_1fr_auto] gap-4 overflow-y-auto p-6"
       style={{ backgroundColor: 'var(--color-yellow)' }}
     >
       <div className="dots pointer-events-none absolute inset-0" aria-hidden />
@@ -288,7 +288,7 @@ export default function HostPage() {
        * resized the room code and the QR depending on the selected game, so
        * the whole screen jumped every time somebody changed their mind.
        */}
-      <div className="relative grid min-h-0 grid-rows-[auto_auto_var(--row-players)_auto_var(--row-options)] content-center items-center justify-items-center gap-5">
+      <div className="relative grid grid-rows-[auto_auto_minmax(var(--row-players),auto)_auto_auto] content-center items-center justify-items-center gap-5 py-2">
         <div className="flex items-center gap-6">
           <Slab tone="chalk" className="px-8 py-3" tilt={-1.5}>
             <p className="text-center font-mono text-[length:var(--text-micro)] font-bold tracking-[0.25em] uppercase opacity-55">
@@ -296,7 +296,7 @@ export default function HostPage() {
             </p>
             <p
               data-room-code={code ?? ''}
-              className="text-center font-mono text-[length:var(--text-mega)] leading-[1.05] font-bold tracking-[0.12em] tabular-nums"
+              className="mt-1 text-center font-mono text-[length:var(--text-mega)] leading-[1] font-bold tracking-[0.12em] tabular-nums"
             >
               {code ?? '••••'}
             </p>
@@ -368,7 +368,7 @@ export default function HostPage() {
         </div>
 
         {/* Fixed height, so what is inside can change without anything moving. */}
-        <div className="flex h-[var(--row-options)] w-full items-center justify-center overflow-y-auto">
+        <div className="flex min-h-[var(--row-options)] w-full items-center justify-center">
           {pick === 'hearsay' && (
             <div className="flex items-center gap-3">
               <span className="font-mono text-[length:var(--text-micro)] font-bold tracking-widest uppercase opacity-50">

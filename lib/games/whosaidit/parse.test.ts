@@ -36,6 +36,26 @@ const DASH_EXPORT = [
   '12/01/2024, 21:47 - Riya changed the subject to "the group but worse"',
 ].join('\n')
 
+describe('filler and attachment rejection', () => {
+  // From the real export: these survived the earlier thresholds.
+  it('rejects a file attachment line masquerading as a message', () => {
+    expect(isUsableMessage('Payment_Receipt_1778083532690.pdf • 2 pages')).toBe(false)
+    expect(isUsableMessage('here is the deck IMG_20260101.jpeg have a look')).toBe(false)
+  })
+
+  it('rejects a four word fragment with no voice', () => {
+    expect(isUsableMessage('Door lock, exhaust, chimney')).toBe(false)
+  })
+
+  it('rejects a paragraph that would not fit a shared screen', () => {
+    expect(isUsableMessage('a'.repeat(60) + ' ' + 'word '.repeat(30))).toBe(false)
+  })
+
+  it('keeps a real five word line', () => {
+    expect(isUsableMessage('Subha kitne baje ka bolu?')).toBe(true)
+  })
+})
+
 describe('real export shapes', () => {
   // These come from an actual iOS export. Fixtures did not catch either case.
   it('strips the bidi isolates WhatsApp wraps mentions in', () => {
