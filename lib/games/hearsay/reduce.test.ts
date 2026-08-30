@@ -144,12 +144,24 @@ describe('guess phase', () => {
     expect(next.rounds[0].predictions.mike).toBe(true)
   })
 
-  it('waits for the crowd even after the accused has answered', () => {
+  it('reveals the moment the accused decides, without waiting for the crowd', () => {
+    // The crowd's yes/no scores nothing, so making the room wait for it was
+    // friction. The accused deciding is the whole cliffhanger.
     const state = inGuess()
     const next = reduceHearsay(state, {
       type: 'input',
       playerId: 'sam',
       payload: { kind: 'guess', questionId: state.rounds[0].question.id },
+    }).state
+    expect(next.phase).toBe('verdict')
+  })
+
+  it('does not reveal on a crowd prediction alone', () => {
+    const state = inGuess()
+    const next = reduceHearsay(state, {
+      type: 'input',
+      playerId: 'mike',
+      payload: { kind: 'predict', willGetIt: true },
     }).state
     expect(next.phase).toBe('guess')
   })
@@ -165,8 +177,8 @@ describe('guess phase', () => {
 
   it('applies scores when entering verdict', () => {
     let state = inGuess()
+    // The guess itself lands in the verdict now, so there is no deadline to wait for.
     state = reduceHearsay(state, { type: 'input', playerId: 'sam', payload: { kind: 'guess', questionId: state.rounds[0].question.id } }).state
-    state = reduceHearsay(state, { type: 'deadline' }).state
     expect(state.phase).toBe('verdict')
     expect(state.scores.sam).toBe(1000)
     expect(state.scores.mike).toBe(500)

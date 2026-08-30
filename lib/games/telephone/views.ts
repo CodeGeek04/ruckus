@@ -33,6 +33,14 @@ export type TelephoneHostView = {
   winners: number[]
   /** How far the winning chains actually drifted. Null until the game ends. */
   finale: { chainIndex: number; starterName: string; first: string; last: string; votes: number }[] | null
+  /**
+   * Every chain in full, once the game is over, so the room can go back and
+   * walk through the ones they missed. Null until then: mid game these beats
+   * are exactly what players must not see.
+   */
+  archive:
+    | { chainIndex: number; starterName: string; votes: number; beats: Beat[] }[]
+    | null
   awarded: Record<PlayerId, number>
   scores: Record<PlayerId, number>
 }
@@ -158,6 +166,15 @@ export function telephoneHostView(state: TelephoneState): TelephoneHostView {
               votes: voteCounts(state)[chainIndex],
             }
           })
+        : null,
+    archive:
+      state.phase === 'ended'
+        ? state.chains.map((chain) => ({
+            chainIndex: chain.index,
+            starterName: state.players.find((p) => p.id === chain.starterId)?.name ?? '?',
+            votes: voteCounts(state)[chain.index],
+            beats: beatsUpTo(state, chain.index, beatsInChain(chain) - 1),
+          }))
         : null,
     awarded: state.awarded,
     scores: state.scores,

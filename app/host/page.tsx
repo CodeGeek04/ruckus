@@ -157,6 +157,7 @@ export default function HostPage() {
   const [tone, setTone] = useState<'mild' | 'spicy'>('spicy')
   const [pick, setPick] = useState<string>('hearsay')
   const [copied, setCopied] = useState(false)
+  const [expandedReset, setExpandedReset] = useState(0)
   // Subscribing matters: without it the readiness check runs once against an
   // empty chat store and never recomputes, so the lobby panel says "ready" while
   // the start button stays disabled forever.
@@ -257,7 +258,7 @@ export default function HostPage() {
           )}
         </div>
 
-        <Screen view={view} />
+        <Screen key={expandedReset} view={view} />
 
         <div className="absolute right-8 bottom-6 z-20 flex items-center gap-3">
           <button
@@ -266,6 +267,21 @@ export default function HostPage() {
           >
             End game
           </button>
+          {ended && (
+            <Button
+              onClick={() => {
+                // Same game, same players, fresh state. Works for every game
+                // because it goes through the module contract, not a per game
+                // restart path.
+                setExpandedReset((n) => n + 1)
+                runtime.current?.start(game)
+              }}
+              tone="mint"
+              size="md"
+            >
+              Play again
+            </Button>
+          )}
           {!ended && SKIPPABLE_SCOREBOARD[game.id] === viewPhase(view) && (
             <button
               onClick={() => {

@@ -177,7 +177,9 @@ async function main() {
     if (heading !== lastPhase) {
       note(`host: ${heading.slice(0, 110)}`)
       lastPhase = heading
-      await checkLayout(host, `host step ${step}`)
+      // The ended screen is a review surface and is allowed to scroll.
+      const atEnd = /final|winner|standings|the room has spoken/i.test(phase)
+      await checkLayout(host, `host step ${step}`, { allowScroll: atEnd })
       await shot(host, `host-${String(step).padStart(2, '0')}`)
       await shot(phones[0].page, `phone-${String(step).padStart(2, '0')}`)
     }

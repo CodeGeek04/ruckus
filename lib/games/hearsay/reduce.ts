@@ -146,9 +146,12 @@ function applyInput(state: HearsayState, playerId: PlayerId, input: HearsayInput
       return { state }
     }
 
+    // The accused's pick is the only thing the round is waiting for. The
+    // crowd's yes/no is a flourish that scores nothing, so holding the reveal
+    // until everyone has tapped it was pure friction: the moment the accused
+    // decides, the room wants to know.
     const current = updated.rounds[updated.roundIndex]
-    const done = current.accusedPick !== null && voterIds.every((id) => current.predictions[id] !== undefined)
-    return done ? enterVerdict(updated) : { state: updated }
+    return current.accusedPick !== null ? enterVerdict(updated) : { state: updated }
   }
 
   return { state }

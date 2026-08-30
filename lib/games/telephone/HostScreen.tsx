@@ -2,6 +2,7 @@
 
 import { Aside, Face, Field, HUES, Slab, Sticker, type Hue } from '@/components/kit'
 import { flavorFor } from '@/lib/flavor'
+import { useState } from 'react'
 import { PLACEHOLDER_IMAGE, type Phase } from './state'
 import type { Beat, TelephoneHostView } from './views'
 import { initials } from '@/lib/text'
@@ -383,7 +384,53 @@ function Drawing({ view }: { view: TelephoneHostView }) {
   )
 }
 
+
+/** One chain saved as a standalone HTML page: captions, images, in order. */
+function downloadChain(chain: { starterName: string; beats: Beat[] }) {
+  const esc = (t: string) =>
+    t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+
+  const body = chain.beats
+    .map((beat) =>
+      beat.kind === 'text'
+        ? `<figure><blockquote>&ldquo;${esc(beat.text)}&rdquo;</blockquote><figcaption>${esc(beat.authorName)} wrote it</figcaption></figure>`
+        : `<figure><img src="${esc(beat.imageUrl)}" alt=""><figcaption>the machine drew it for ${esc(beat.authorName)}</figcaption></figure>`
+    )
+    .join('\n')
+
+  const html = `<!doctype html><meta charset="utf-8"><title>${esc(chain.starterName)}'s chain</title>
+<style>
+ body{background:#faf6ec;color:#17161d;font-family:system-ui,sans-serif;max-width:46rem;margin:3rem auto;padding:0 1.5rem}
+ h1{font-size:2.4rem;letter-spacing:-.02em}
+ figure{margin:0 0 2.5rem}
+ blockquote{margin:0;font-size:1.6rem;font-weight:800;line-height:1.25}
+ img{width:100%;border:4px solid #17161d;border-radius:14px;box-shadow:6px 6px 0 #17161d}
+ figcaption{margin-top:.6rem;font-family:ui-monospace,monospace;font-size:.8rem;text-transform:lowercase;opacity:.6}
+</style>
+<h1>${esc(chain.starterName)}&rsquo;s chain</h1>
+${body}`
+
+  const url = URL.createObjectURL(new Blob([html], { type: 'text/html' }))
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `ruckus-${chain.starterName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-chain.html`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+function firstText(beats: Beat[]): string {
+  return beats.find((b) => b.kind === 'text')?.text ?? ''
+}
+
+function lastText(beats: Beat[]): string {
+  const texts = beats.filter((b) => b.kind === 'text')
+  return texts[texts.length - 1]?.text ?? ''
+}
+
 export function TelephoneHostScreen({ view }: { view: TelephoneHostView }) {
+  // Which chain the room is re-reading. Presentation only: expanding a chain
+  // changes nothing about the game, and the game is over anyway.
+  const [expanded, setExpanded] = useState<number | null>(null)
   const writing = view.phase === 'write' || view.phase === 'describe'
   const hue = PHASE_HUE[view.phase]
 
@@ -451,40 +498,91 @@ export function TelephoneHostScreen({ view }: { view: TelephoneHostView }) {
         )}
 
         {view.phase === 'ended' && (
-          <Stage>
+          <div className="flex min-h-0 flex-col items-center gap-[clamp(0.6rem,2vh,1.4rem)] overflow-y-auto">
             {view.finale?.length ? (
-              <>
-                <Sticker tone="yellow" tilt={-4}>
-                  Winner
-                </Sticker>
-                <div className="flex min-h-0 flex-wrap items-start justify-center gap-[clamp(1rem,3vw,2.5rem)] overflow-hidden">
-                  {view.finale.map((chain) => (
-                    <Slab
-                      key={chain.chainIndex}
-                      tone="chalk"
-                      className="rise w-[min(56ch,80vw)] px-[clamp(1.2rem,4vw,3rem)] py-[clamp(0.8rem,2.5vh,1.8rem)]"
-                      tilt={-0.8}
-                    >
-                      <p className="text-[clamp(1rem,2vw,1.6rem)] font-extrabold tracking-tight uppercase">
-                        {chain.starterName}&rsquo;s chain &middot; {chain.votes} votes
-                      </p>
-                      <p className="mt-3 text-[clamp(1.1rem,2.2vw,1.9rem)] leading-tight font-bold">
-                        &ldquo;{chain.first}&rdquo;
-                      </p>
-                      <p className="my-2 font-mono text-[clamp(0.75rem,1.4vw,1.1rem)] font-bold tracking-[0.3em] uppercase opacity-55">
-                        became
-                      </p>
-                      <p className="text-[clamp(1.4rem,3.2vw,2.8rem)] leading-tight font-extrabold">
-                        &ldquo;{chain.last}&rdquo;
-                      </p>
-                    </Slab>
-                  ))}
-                </div>
-              </>
+              <Sticker tone="yellow" tilt={-4}>
+                Winner
+              </Sticker>
             ) : (
               <Headline size="md">Nobody voted. Nobody wins.</Headline>
             )}
-          </Stage>
+
+            <p className="font-mono text-[clamp(0.7rem,1.2vw,0.95rem)] font-bold lowercase opacity-55">
+              tap any chain to walk through it again
+            </p>
+
+            <div className="flex w-full flex-wrap items-start justify-center gap-[clamp(0.8rem,2vw,1.8rem)] pb-4">
+              {(view.archive ?? []).map((chain) => {
+                const won = (view.winners ?? []).includes(chain.chainIndex)
+                const open = expanded === chain.chainIndex
+                return (
+                  <Slab
+                    key={chain.chainIndex}
+                    tone={won ? 'yellow' : 'chalk'}
+                    className={`rise ${open ? 'w-[min(70ch,92vw)]' : 'w-[min(44ch,86vw)]'} px-[clamp(1rem,3vw,2.2rem)] py-[clamp(0.7rem,2vh,1.4rem)]`}
+                    tilt={-0.8}
+                  >
+                    <button
+                      onClick={() => setExpanded(open ? null : chain.chainIndex)}
+                      aria-expanded={open}
+                      className="w-full text-left"
+                    >
+                      <p className="text-[clamp(0.9rem,1.7vw,1.4rem)] font-extrabold tracking-tight uppercase">
+                        {chain.starterName}&rsquo;s chain &middot; {chain.votes}{' '}
+                        {chain.votes === 1 ? 'vote' : 'votes'}
+                      </p>
+                    </button>
+
+                    {open ? (
+                      <div className="mt-3 flex flex-col gap-3">
+                        {chain.beats.map((beat, i) =>
+                          beat.kind === 'text' ? (
+                            <p
+                              key={i}
+                              className="text-[clamp(1rem,1.9vw,1.5rem)] leading-tight font-extrabold"
+                            >
+                              &ldquo;{beat.text}&rdquo;
+                            </p>
+                          ) : beat.failed ? (
+                            <p key={i} className="font-mono text-sm font-bold lowercase opacity-55">
+                              the machine gave up on this one
+                            </p>
+                          ) : (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              key={i}
+                              src={beat.imageUrl}
+                              alt=""
+                              className="slab-sm w-full object-contain"
+                              style={{ maxHeight: '34vh' }}
+                            />
+                          )
+                        )}
+                        <button
+                          onClick={() => downloadChain(chain)}
+                          className="slab-sm press-sm self-start bg-[var(--color-mint)] px-4 py-2 font-mono text-xs font-bold lowercase"
+                        >
+                          save this chain
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <p className="mt-2 text-[clamp(0.9rem,1.7vw,1.3rem)] leading-tight font-bold">
+                          &ldquo;{firstText(chain.beats)}&rdquo;
+                        </p>
+                        <p className="my-1 font-mono text-[clamp(0.65rem,1.1vw,0.9rem)] font-bold tracking-[0.3em] uppercase opacity-55">
+                          became
+                        </p>
+                        <p className="text-[clamp(1.1rem,2.4vw,2rem)] leading-tight font-extrabold">
+                          &ldquo;{lastText(chain.beats)}&rdquo;
+                        </p>
+                      </>
+                    )}
+                  </Slab>
+                )
+              })}
+            </div>
+          </div>
         )}
 
         <footer className="flex shrink-0 items-center justify-center">
