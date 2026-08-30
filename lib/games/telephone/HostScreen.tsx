@@ -136,7 +136,7 @@ function Stage({ children, className = '' }: { children: React.ReactNode; classN
 }
 
 function Headline({ children, size = 'lg' }: { children: React.ReactNode; size?: 'lg' | 'md' }) {
-  const scale = size === 'lg' ? 'clamp(2.2rem,7.5vw,6rem)' : 'clamp(1.6rem,4.4vw,3.4rem)'
+  const scale = size === 'lg' ? 'clamp(2.6rem,8.5vw,7rem)' : 'clamp(1.8rem,5vw,3.8rem)'
   return (
     <h2
       className="rise max-w-[22ch] leading-[0.92] font-extrabold tracking-tighter uppercase"
@@ -188,7 +188,7 @@ function Reveal({ view }: { view: TelephoneHostView }) {
             <Picture
               url={current.imageUrl}
               failed={current.failed}
-              height="clamp(10rem,44vh,32rem)"
+              height="clamp(10rem,48vh,34rem)"
               tilt={-1.2}
             />
           </div>
@@ -278,7 +278,17 @@ function Waiting({ view }: { view: TelephoneHostView }) {
   return (
     <div className="flex flex-wrap items-end justify-center gap-[clamp(0.6rem,1.6vw,1.4rem)] pr-64">
       {view.players.map((player) => (
-        <Face key={player.id} name={player.name} color={player.color} size="sm" dim={pending.has(player.name)} />
+        <div key={player.id} className="relative">
+          <Face name={player.name} color={player.color} size="sm" />
+          {!pending.has(player.name) && (
+            <span
+              className="slab-sm pop absolute -top-2 -right-3 grid h-6 w-6 place-items-center text-xs font-extrabold"
+              style={{ backgroundColor: HUES.lime, borderRadius: 999 }}
+            >
+              ✓
+            </span>
+          )}
+        </div>
       ))}
     </div>
   )
@@ -339,12 +349,12 @@ function Drawing({ view }: { view: TelephoneHostView }) {
               key={i}
               className={`slab-sm grid place-items-center ${back ? 'pop' : 'wobble'}`}
               style={{
-                height: 'clamp(3rem,11vh,7rem)',
-                width: 'clamp(3rem,11vh,7rem)',
+                height: 'clamp(3.5rem,14vh,8.5rem)',
+                width: 'clamp(3.5rem,14vh,8.5rem)',
                 backgroundColor: back ? HUES.yellow : 'var(--color-chalk)',
               }}
             >
-              <span className="text-[clamp(1.2rem,4vh,2.4rem)] leading-none font-extrabold">
+              <span className="text-[clamp(1.4rem,5vh,3rem)] leading-none font-extrabold">
                 {back ? '★' : '···'}
               </span>
             </div>
@@ -356,15 +366,15 @@ function Drawing({ view }: { view: TelephoneHostView }) {
         {view.drawn} of {view.total} pictures back
       </p>
 
-      <Slab tone="chalk" className="max-w-[46ch] px-[clamp(1rem,3vw,2.5rem)] py-[clamp(0.4rem,1.4vh,1rem)]" tilt={-1}>
-        <p className="truncate font-mono text-[clamp(0.8rem,1.6vw,1.3rem)] font-bold lowercase">
+      <Slab tone="chalk" className="max-w-[60ch] px-[clamp(1rem,3vw,2.5rem)] py-[clamp(0.4rem,1.4vh,1rem)]" tilt={-1}>
+        <p className="font-mono text-[clamp(0.8rem,1.6vw,1.3rem)] font-bold lowercase">
           {muttering}
         </p>
       </Slab>
 
       <div className="min-h-[clamp(1.2rem,3.5vh,2.2rem)]">
         {view.waitingOn.length > 0 && (
-          <p className="max-w-[44ch] truncate font-mono text-[clamp(0.75rem,1.4vw,1.1rem)] font-bold lowercase opacity-65">
+          <p className="max-w-[44ch] font-mono text-[clamp(0.75rem,1.4vw,1.1rem)] font-bold lowercase opacity-65">
             still waiting on {view.waitingOn.join(', ')}
           </p>
         )}
@@ -452,19 +462,19 @@ export function TelephoneHostScreen({ view }: { view: TelephoneHostView }) {
                     <Slab
                       key={chain.chainIndex}
                       tone="chalk"
-                      className="rise max-w-[36ch] px-[clamp(1rem,3vw,2.5rem)] py-[clamp(0.8rem,2.2vh,1.6rem)]"
+                      className="rise w-[min(56ch,80vw)] px-[clamp(1.2rem,4vw,3rem)] py-[clamp(0.8rem,2.5vh,1.8rem)]"
                       tilt={-0.8}
                     >
                       <p className="text-[clamp(1rem,2vw,1.6rem)] font-extrabold tracking-tight uppercase">
                         {chain.starterName}&rsquo;s chain &middot; {chain.votes} votes
                       </p>
-                      <p className="mt-3 text-[clamp(1.1rem,2.4vw,2rem)] leading-tight font-bold">
+                      <p className="mt-3 text-[clamp(1.1rem,2.2vw,1.9rem)] leading-tight font-bold">
                         &ldquo;{chain.first}&rdquo;
                       </p>
                       <p className="my-2 font-mono text-[clamp(0.75rem,1.4vw,1.1rem)] font-bold tracking-[0.3em] uppercase opacity-55">
                         became
                       </p>
-                      <p className="text-[clamp(1.3rem,3vw,2.6rem)] leading-tight font-extrabold">
+                      <p className="text-[clamp(1.4rem,3.2vw,2.8rem)] leading-tight font-extrabold">
                         &ldquo;{chain.last}&rdquo;
                       </p>
                     </Slab>
