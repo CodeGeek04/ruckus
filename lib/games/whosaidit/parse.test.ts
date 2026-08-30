@@ -36,6 +36,35 @@ const DASH_EXPORT = [
   '12/01/2024, 21:47 - Riya changed the subject to "the group but worse"',
 ].join('\n')
 
+describe('variety across sessions', () => {
+  // The old code sorted by quality and took the top, so every game on one
+  // export served the same ten messages. Measured: 10 of 10 identical.
+  const authors = ['shivam', 'riya', 'aman']
+  const corpus = authors.flatMap((author) =>
+    Array.from({ length: 40 }, (_, i) => ({
+      id: `${author}-${i}`,
+      author,
+      text: `this is message number ${i} from ${author} and it is long enough to count`,
+    }))
+  )
+
+  it('does not serve the same messages twice in a row', () => {
+    const first = chooseRoundMessages(corpus, { authors, count: 10 }).map((m) => m.id)
+    const second = chooseRoundMessages(corpus, { authors, count: 10 }).map((m) => m.id)
+    const shared = first.filter((id) => second.includes(id)).length
+    expect(shared).toBeLessThan(6)
+  })
+
+  it('reaches deep into the material over many games', () => {
+    const seen = new Set<string>()
+    for (let i = 0; i < 15; i++) {
+      for (const m of chooseRoundMessages(corpus, { authors, count: 10 })) seen.add(m.id)
+    }
+    // Far more than the 10 a deterministic pick would ever reach.
+    expect(seen.size).toBeGreaterThan(25)
+  })
+})
+
 describe('filler and attachment rejection', () => {
   // From the real export: these survived the earlier thresholds.
   it('rejects a file attachment line masquerading as a message', () => {

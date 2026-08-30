@@ -291,6 +291,14 @@ export type ChooseOptions = {
  * survive, and the picks are dealt round robin so the loudest person in the
  * chat does not become the answer to every round.
  */
+/**
+ * How much of each author's ranked material is in play. Wide enough that a
+ * group can play many nights without repeats, tight enough that every line
+ * served is still one of their better ones.
+ */
+const POOL_FRACTION = 0.35
+const MIN_POOL = 25
+
 export function chooseRoundMessages(
   messages: readonly ChatMessage[],
   { authors, count }: ChooseOptions
@@ -305,12 +313,16 @@ export function chooseRoundMessages(
       .map((m) => ({ message: m, quality: messageQuality(m.text, { otherNames: others }) }))
       .filter((m) => m.quality > 0)
 
-    // Shuffle before the sort so equal scores do not always resolve to the
-    // same messages, then take the best. Two sessions on one export should
-    // not be the same ten rounds.
-    const ranked = shuffled(mine)
-      .sort((a, b) => b.quality - a.quality)
-      .map((m) => m.message)
+    // Sample from a band of good messages rather than taking the best.
+    //
+    // Sorting and taking the top served the same message every single game:
+    // quality is deterministic, so an author's highest scoring line never
+    // changes, and shuffling only broke exact ties which almost never happen.
+    // Now the strongest slice is shuffled and dealt from, which keeps the
+    // quality bar while making two sessions on one export genuinely different.
+    const sorted = mine.sort((a, b) => b.quality - a.quality)
+    const bandSize = Math.max(MIN_POOL, Math.ceil(sorted.length * POOL_FRACTION))
+    const ranked = shuffled(sorted.slice(0, bandSize)).map((m) => m.message)
     if (ranked.length > 0) byAuthor.set(author, ranked)
   }
 
