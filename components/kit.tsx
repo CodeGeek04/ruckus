@@ -184,9 +184,19 @@ export function Face({
     <div className={`flex flex-col items-center gap-1.5 ${dim ? 'opacity-35' : ''}`}>
       <div className="relative">
         {crown && <span className="absolute -top-4 left-1/2 -translate-x-1/2 text-2xl">👑</span>}
+        {/*
+          * A chalk outline sits outside the ink border so a player's colour can
+          * never vanish into a phase field of the same hue. Blue on blue was
+          * invisible before this.
+          */}
         <div
           className={`slab-sm grid place-items-center font-extrabold uppercase ${box}`}
-          style={{ backgroundColor: color, borderRadius: 999 }}
+          style={{
+            backgroundColor: color,
+            borderRadius: 999,
+            outline: '3px solid var(--color-chalk)',
+            outlineOffset: 0,
+          }}
         >
           {initials(name)}
         </div>
