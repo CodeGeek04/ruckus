@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Player } from '@/lib/types'
-import type { ChatMessage } from './parse'
+import { parseWhatsAppExport, type ChatMessage } from './parse'
 import { buildRounds, initWhoSaidIt, reduceWhoSaidIt } from './reduce'
 import { DEFAULT_CONFIG, type ChatSource } from './state'
 
@@ -287,5 +287,54 @@ describe('round transitions', () => {
     const after = reduceWhoSaidIt(state, { type: 'deadline' })
     expect(after.state.phase).toBe('ended')
     expect(after.state.roundIndex).toBe(9)
+  })
+})
+
+describe('a whole game from a raw export', () => {
+  /** Written to look like what a real group produces: noise, reactions,
+   *  media placeholders and a handful of lines worth putting on screen. */
+  const EXPORT = [
+    '[12/01/24, 9:40:00 PM] Messages and calls are end-to-end encrypted.',
+    ...['shivam', 'riya', 'aman'].flatMap((author, a) =>
+      Array.from({ length: 8 }, (_, i) => [
+        `[12/01/24, 9:4${i}:0${a} PM] ${author}: ok`,
+        `[12/01/24, 9:4${i}:1${a} PM] ${author}: <Media omitted>`,
+        `[12/01/24, 9:4${i}:2${a} PM] ${author}: I genuinely cannot believe the ${'very '.repeat(i % 3)}wrong month got booked again, take ${a}${i}`,
+      ]).flat()
+    ),
+  ].join('\n')
+
+  it('parses, builds ten rounds and plays them all out', () => {
+    const parsed = parseWhatsAppExport(EXPORT)
+    const state = initWhoSaidIt(players, {
+      messages: parsed,
+      mapping: { shivam: 'sam', riya: 'mike', aman: 'ron' },
+    })
+
+    expect(state.problem).toBeNull()
+    expect(state.rounds).toHaveLength(10)
+    for (const round of state.rounds) {
+      expect(round.text).not.toBe('ok')
+      expect(round.text).not.toContain('Media omitted')
+      expect(round.candidateIds).toEqual(['sam', 'mike', 'ron'])
+    }
+
+    let playing = state
+    let guard = 0
+    while (playing.phase !== 'ended' && guard++ < 200) {
+      if (playing.phase === 'message') {
+        // Emily always blames Sam. She is right whenever Sam wrote it.
+        playing = reduceWhoSaidIt(playing, {
+          type: 'input',
+          playerId: 'emily',
+          payload: { kind: 'guess', targetId: 'sam' },
+        }).state
+      }
+      playing = reduceWhoSaidIt(playing, { type: 'deadline' }).state
+    }
+
+    const samRounds = state.rounds.filter((r) => r.authorId === 'sam').length
+    expect(playing.phase).toBe('ended')
+    expect(playing.scores.emily).toBe(samRounds * 500)
   })
 })
