@@ -163,8 +163,32 @@ export function isUsableMessage(text: string, options: QualityOptions = {}): boo
   return messageQuality(text, options) > 0
 }
 
+/**
+ * Invisible formatting characters WhatsApp sprinkles through exports: the LRM
+ * that prefixes attachments, and the bidi isolates that wrap every @mention.
+ * Leaving the isolates in means a mention never matches anything and shows up
+ * on screen as boxes.
+ */
+const INVISIBLE = /[\u200e\u200f\u2066-\u2069\ufeff]/g
+
+/**
+ * An attachment appended to a real message, which iOS writes inline rather than
+ * as its own line: "I am obsessed with this chart image omitted".
+ */
+const TRAILING_ATTACHMENT =
+  /\s*(<media omitted>|<attached:[^>]*>|(image|video|audio|sticker|gif|document|contact card|photo)( file)? omitted)\s*/gi
+
+/** A mention, once the bidi isolates around it are gone. */
+const MENTION = /@[^\s@]+/g
+
 function cleanBody(raw: string): string | null {
-  const text = raw.replace(EDITED_MARKER, '').replace(/‎/g, '').trim()
+  const text = raw
+    .replace(EDITED_MARKER, '')
+    .replace(INVISIBLE, '')
+    .replace(TRAILING_ATTACHMENT, ' ')
+    .replace(MENTION, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
   if (!text) return null
   if (PLACEHOLDER.test(text)) return null
   if (LINK_ONLY.test(text)) return null

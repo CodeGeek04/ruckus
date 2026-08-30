@@ -119,7 +119,10 @@ export function WhoSaidItLobbySetup({ players }: { players: Player[] }) {
     )
   }
 
-  const stats = authorStats(source.messages).filter((s) => s.total >= MIN_AUTHOR_MESSAGES)
+  // Filter on usable, not total: an author with 40 messages that are all "ok"
+  // and attachments has nothing to serve, and the group's own system author
+  // ("Hackerhouse v2.0.0") shows up with messages but zero usable ones.
+  const stats = authorStats(source.messages).filter((s) => s.usable >= MIN_AUTHOR_MESSAGES)
   const status = whoSaidItStatus(players)
 
   return (

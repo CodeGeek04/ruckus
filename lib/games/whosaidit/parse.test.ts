@@ -36,6 +36,33 @@ const DASH_EXPORT = [
   '12/01/2024, 21:47 - Riya changed the subject to "the group but worse"',
 ].join('\n')
 
+describe('real export shapes', () => {
+  // These come from an actual iOS export. Fixtures did not catch either case.
+  it('strips the bidi isolates WhatsApp wraps mentions in', () => {
+    const [msg] = parseWhatsAppExport('[24/03/26, 8:40:49 PM] Vamsi: \u2068@\u2069\u2068Abhishek\u2069 flat pe nahi h kya')
+    expect(msg.text).not.toContain('\u2068')
+    expect(msg.text).not.toContain('@')
+    expect(msg.text).toBe('flat pe nahi h kya')
+  })
+
+  it('strips a media placeholder appended to real text', () => {
+    const [msg] = parseWhatsAppExport('[24/03/26, 8:40:49 PM] Mohan: I am obsessed with this chart \u200eimage omitted')
+    expect(msg.text).toBe('I am obsessed with this chart')
+  })
+
+  it('drops a message that is only a mention and an attachment', () => {
+    const msgs = parseWhatsAppExport('[24/03/26, 8:40:49 PM] Dhruv: \u2068@\u2069\u2068Vamsi\u2069 \u200eimage omitted')
+    expect(msgs).toHaveLength(0)
+  })
+
+  it('handles every iOS attachment wording', () => {
+    for (const kind of ['image', 'video', 'audio', 'sticker', 'GIF', 'document', 'Contact card']) {
+      const msgs = parseWhatsAppExport(`[24/03/26, 8:40:49 PM] Sam: real words here \u200e${kind} omitted`)
+      expect(msgs[0]?.text, kind).toBe('real words here')
+    }
+  })
+})
+
 describe('parseWhatsAppExport', () => {
   it('reads the bracketed iOS format', () => {
     const messages = parseWhatsAppExport(BRACKET_EXPORT)
