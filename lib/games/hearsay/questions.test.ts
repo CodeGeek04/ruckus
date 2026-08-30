@@ -18,6 +18,16 @@ describe('QUESTION_BANK', () => {
     expect(new Set(QUESTION_BANK.map((q) => q.id)).size).toBe(QUESTION_BANK.length)
   })
 
+  it('every question is actually a question that names a person', () => {
+    // Generated batches have produced statements ("{X} is the one who stays.")
+    // which cannot be answered by pointing at anyone. This catches them.
+    const asksForAPerson = /\b(who|whom|whose|which (person|friend|coworker|colleague|one))\b/i
+    for (const q of QUESTION_BANK) {
+      expect(q.template.trim().endsWith('?'), `not a question: ${q.template}`).toBe(true)
+      expect(asksForAPerson.test(q.template), `no person asked for: ${q.template}`).toBe(true)
+    }
+  })
+
   it('every question addresses the accused by placeholder', () => {
     for (const q of QUESTION_BANK) expect(q.template).toContain('{X}')
   })

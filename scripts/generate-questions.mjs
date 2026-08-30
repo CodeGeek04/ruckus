@@ -83,6 +83,7 @@ Write ${count} questions.
 
 Rules:
 - Every question MUST contain {X} exactly once.
+- Every question must END WITH A QUESTION MARK. Never write a statement.
 - CRITICAL: the ONLY valid answer is the name of another person in the room. Never ask "how long", "how much", "how many", "what" or anything answerable with a duration, an amount, a yes or no, or a thing. If the question cannot be answered by pointing at a friend, it is wrong.
 - Simple, everyday vocabulary. Short. Under 12 words where possible.
 - No em dashes anywhere.
@@ -129,13 +130,20 @@ Return ONLY a JSON array of strings. No commentary, no markdown fence.`
   const text = block.text
   const questions = JSON.parse(text.slice(text.indexOf('['), text.lastIndexOf(']') + 1))
 
-  const bad = questions.filter((q) => !q.includes('{X}') || q.includes('—'))
+  // Every question must end in a question mark and ask for a person. Batches
+  // regularly return statements like "{X} is the one who stays", which cannot
+  // be answered by pointing at anyone.
+  const asksForAPerson = /\b(who|whom|whose|which (person|friend|coworker|colleague|one))\b/i
+  const valid = (q) =>
+    q.includes('{X}') && !q.includes('\u2014') && q.trim().endsWith('?') && asksForAPerson.test(q)
+
+  const bad = questions.filter((q) => !valid(q))
   if (bad.length) {
     console.error(`Rejected ${bad.length} malformed questions from the ${family} batch:`)
     for (const q of bad) console.error(`  ${q}`)
   }
 
-  return { family, questions: questions.filter((q) => q.includes('{X}') && !q.includes('—')), usage: body.usage }
+  return { family, questions: questions.filter(valid), usage: body.usage }
 }
 
 let inputTokens = 0
