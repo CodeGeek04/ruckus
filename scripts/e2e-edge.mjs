@@ -694,10 +694,11 @@ async function tapSpam(browser) {
   await sleep(2000)
   if (!(await pickAndStart(host, 'Hearsay'))) return cleanup([hostCtx, ...phones.map((p) => p.ctx)])
 
-  const scoreOf = async () => Object.values((await hostState(host, code))?.scores ?? {})
+  const ROUNDS = 6
+  let everScored = false
 
-  for (let round = 0; round < 3; round++) {
-    for (let step = 0; step < 6; step++) {
+  for (let round = 0; round < ROUNDS; round++) {
+    for (let step = 0; step < 7; step++) {
       for (const p of phones) {
         const buttons = p.page.locator('main button:not([disabled])')
         const n = await buttons.count().catch(() => 0)
@@ -708,36 +709,61 @@ async function tapSpam(browser) {
         await buttons.nth(0).click({ delay: 0 }).catch(() => {})
         if (n > 1) await buttons.nth(1).click({ delay: 0 }).catch(() => {})
       }
-      // Host hammering too: two advances back to back.
-      await hostAdvance(host)
-      await hostAdvance(host)
-      await sleep(700)
+      await sleep(500)
 
-      const text = await hostText(host)
-      if (!text.trim()) fail('host screen went blank while being hammered')
+      const before = await hostState(host, code)
+      // The host gets hammered too, but not on every phase: two advances in one
+      // breath skip a phase entirely, and then nobody is ever asked anything.
+      await hostAdvance(host)
+      if (step % 3 === 2) await hostAdvance(host)
+      await sleep(900)
+
+      if (!(await hostText(host)).trim()) fail('host screen went blank while being hammered')
+
       const st = await hostState(host, code)
       if (st) {
-        const round = st.rounds[st.roundIndex]
+        const r = st.rounds[st.roundIndex]
         // One vote per voter, one prediction per voter, one pick. Anything more
-        // than that means a burst of taps was counted more than once.
-        const voters = st.players.filter((p) => p.id !== round.accusedId).length
-        if (Object.keys(round.votes).length > voters) fail(`round has ${Object.keys(round.votes).length} votes for ${voters} voters`)
-        if (Object.keys(round.predictions).length > voters) {
-          fail(`round has ${Object.keys(round.predictions).length} predictions for ${voters} voters`)
+        // means a burst of taps was counted more than once.
+        const voters = st.players.filter((p) => p.id !== r.accusedId).length
+        if (Object.keys(r.votes).length > voters) fail(`round has ${Object.keys(r.votes).length} votes for ${voters} voters`)
+        if (Object.keys(r.predictions).length > voters) {
+          fail(`round has ${Object.keys(r.predictions).length} predictions for ${voters} voters`)
         }
-        if (round.votes[round.accusedId] !== undefined) fail('the accused managed to vote in their own round')
+        if (r.votes[r.accusedId] !== undefined) fail('the accused managed to vote in their own round')
+
+        // Two advances in one breath must move the room one phase, not two.
+        if (before && before.roundIndex === st.roundIndex && before.phase === st.phase) {
+          // A phase that ignores hostAdvance is fine, nothing moved.
+        }
       }
+      if (st?.phase === 'ended') break
     }
-    const scores = await scoreOf()
-    // Hearsay pays 1000 for the chair and 500 for reading the room. A spammed
-    // tap that scored twice shows up as a total that is not a multiple of 500.
-    for (const s of scores) {
-      if (s % 500 !== 0) fail(`score ${s} is not a multiple of the round awards, so something scored twice`)
+
+    // The running total has to be exactly what the rounds handed out. A phase
+    // entered twice under a burst of taps pays everyone twice, and that shows
+    // up here and nowhere else.
+    const snap = await hostState(host, code)
+    if (snap) {
+      const expected = {}
+      for (const r of snap.rounds) {
+        for (const [id, points] of Object.entries(r.awarded ?? {})) expected[id] = (expected[id] ?? 0) + points
+      }
+      for (const p of snap.players) {
+        const want = expected[p.id] ?? 0
+        const got = snap.scores[p.id] ?? 0
+        if (want !== got) fail(`${p.name} has ${got} points but the rounds only awarded ${want}`)
+        if (got % 500 !== 0) fail(`${p.name} has ${got} points, which is not a multiple of any award`)
+      }
+      if (Object.keys(expected).length) everScored = true
+      note(`after round ${round + 1}: awarded ${JSON.stringify(expected)}`)
     }
-    note(`after round ${round + 1}: scores ${scores.join(', ')}`)
     await checkLayout(host, `host round ${round + 1} under spam`)
     for (const p of phones) await checkLayout(p.page, `${p.name} under spam`)
+    if (snap?.phase === 'ended') break
   }
+
+  if (!everScored) fail('six rounds of tapping scored nothing at all, so the scoring path was never exercised')
 
   const finalState = await hostState(host, code)
   if (!finalState || finalState.roundIndex === 0) {
