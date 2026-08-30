@@ -1,13 +1,14 @@
 import type { Metadata, Viewport } from 'next'
-import { Archivo, Azeret_Mono } from 'next/font/google'
+import { Azeret_Mono, Bricolage_Grotesque } from 'next/font/google'
 import './globals.css'
 
-// Archivo: wide heavy grotesque, legible through a compressed stream at four
-// metres. Azeret Mono carries the institutional voice: codes, timers, verdicts.
-const archivo = Archivo({
+// Bricolage Grotesque: characterful, slightly irregular, heavy enough to shout
+// and odd enough to have a face. Azeret Mono carries the institutional voice:
+// codes, timers, verdicts, anything the machine says.
+const bricolage = Bricolage_Grotesque({
   subsets: ['latin'],
-  variable: '--font-archivo',
-  weight: ['400', '500', '600', '700', '800', '900'],
+  variable: '--font-bricolage',
+  weight: ['400', '600', '700', '800'],
   display: 'swap',
 })
 
@@ -28,12 +29,12 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
-  themeColor: '#17161d',
+  themeColor: '#faf6ec',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${archivo.variable} ${azeret.variable}`}>
+    <html lang="en" className={`${bricolage.variable} ${azeret.variable}`}>
       <body className="h-full antialiased">{children}</body>
     </html>
   )

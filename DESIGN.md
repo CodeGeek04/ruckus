@@ -1,6 +1,8 @@
 # Ruckus design system
 
-Gumroad's structural language: flat saturated blocks, hard black borders, hard offset shadows, chunky type, zero gradients. Applied to two surfaces with different canvases, because they are looked at in completely different conditions.
+Gumroad's structural language: flat saturated blocks, hard black borders, hard offset shadows, chunky type, zero gradients.
+
+**Both surfaces are bright.** An earlier version made the host screen near-black on the theory that it survived video compression better. It did, and it also made a party game look like an incident dashboard. Flat saturated colour compresses fine. Joy is the requirement; legibility is a constraint on how we get there, not the goal itself.
 
 ## Color
 
