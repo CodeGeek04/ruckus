@@ -1,4 +1,120 @@
 @import 'tailwindcss';
 
-html, body { height: 100%; background: #0a0a0f; color: white; }
-body { overscroll-behavior: none; -webkit-tap-highlight-color: transparent; }
+/*
+ * Ruckus tokens. See DESIGN.md.
+ *
+ * Two canvases on purpose: the host is watched through Discord's encoder in a
+ * dark room, the phone is held six inches from a face in a lit one. Same
+ * borders, same shadows, same type, opposite grounds.
+ */
+@theme {
+  --color-ink: oklch(0.16 0.02 285);
+  --color-ink-soft: oklch(0.28 0.02 285);
+  --color-paper: oklch(0.96 0.015 90);
+  --color-chalk: oklch(0.99 0.005 90);
+
+  --color-shout: oklch(0.78 0.19 350);
+  --color-verdict: oklch(0.8 0.17 95);
+  --color-gain: oklch(0.72 0.19 150);
+  --color-loss: oklch(0.63 0.22 25);
+
+  --font-display: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-azeret), ui-monospace, monospace;
+
+  /* Hard offset shadows, never blurred. Nothing floats, nothing glows. */
+  --shadow-hard: 5px 5px 0 var(--color-ink);
+  --shadow-hard-sm: 3px 3px 0 var(--color-ink);
+  --shadow-hard-lg: 8px 8px 0 var(--color-ink);
+
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: var(--color-ink);
+  color: var(--color-paper);
+  font-family: var(--font-display);
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Scores and timers must not reflow the layout as they change. */
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * The host screen's own shadow colour is a light ink, because a black shadow on
+ * a black ground is invisible. Phones keep the true ink shadow on cream.
+ */
+.host {
+  --shadow-hard: 5px 5px 0 oklch(0.42 0.02 285);
+  --shadow-hard-sm: 3px 3px 0 oklch(0.42 0.02 285);
+  --shadow-hard-lg: 8px 8px 0 oklch(0.42 0.02 285);
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes stamp {
+  from {
+    opacity: 0;
+    transform: scale(1.35) rotate(-4deg);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes shove {
+  0%,
+  100% {
+    transform: none;
+  }
+  25% {
+    transform: translateX(-4px);
+  }
+  75% {
+    transform: translateX(4px);
+  }
+}
+
+.rise {
+  animation: rise 0.42s var(--ease-out-expo) both;
+}
+
+.stamp {
+  animation: stamp 0.38s var(--ease-out-expo) both;
+}
+
+.shove {
+  animation: shove 0.3s ease-out both;
+}
+
+/* Motion conveys state here, so when it is unwelcome the state must still land. */
+@media (prefers-reduced-motion: reduce) {
+  .rise,
+  .stamp,
+  .shove {
+    animation: none;
+  }
+
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+  }
+}
