@@ -117,7 +117,12 @@ const errors = []
 function watch(page, who) {
   page.on('pageerror', (e) => errors.push(`${who}: ${e.message}`))
   page.on('console', (m) => {
-    if (m.type() === 'error') errors.push(`${who} console: ${m.text().slice(0, 160)}`)
+    if (m.type() !== 'error') return
+    const text = m.text()
+    // The browser logs a failed WebSocket handshake itself. Reconnect attempts
+    // while the network is down are the bus working, not a fault.
+    if (/WebSocket connection to .* failed/.test(text)) return
+    errors.push(`${who} console: ${text.slice(0, 160)}`)
   })
 }
 
@@ -127,7 +132,36 @@ const REJECTION_HOOK = `
   window.addEventListener('unhandledrejection', (e) => {
     console.error('unhandledrejection: ' + (e.reason && e.reason.message ? e.reason.message : String(e.reason)))
   })
+
+  // Test only. context.setOffline blocks new connections but leaves an
+  // established socket buffering, so it reconnects the instant the network is
+  // back and nothing is actually exercised. Keeping a handle on the bus socket
+  // lets a scenario drop it the way a phone losing signal really does.
+  window.__busSockets = []
+  const NativeWebSocket = window.WebSocket
+  window.WebSocket = function (url, protocols) {
+    const ws = new NativeWebSocket(url, protocols)
+    if (String(url).includes('event/realtime')) window.__busSockets.push(ws)
+    return ws
+  }
+  window.WebSocket.prototype = NativeWebSocket.prototype
+  Object.assign(window.WebSocket, NativeWebSocket)
 `
+
+/** Kill the phone's live connection the way losing signal does. */
+async function dropSocket(page) {
+  return page.evaluate(() => {
+    const sockets = window.__busSockets ?? []
+    let closed = 0
+    for (const ws of sockets) {
+      if (ws.readyState === 0 || ws.readyState === 1) {
+        ws.close()
+        closed += 1
+      }
+    }
+    return closed
+  })
+}
 
 async function openHost(browser, { width = 1440, height = 900 } = {}) {
   const ctx = await browser.newContext({ viewport: { width, height } })
@@ -446,31 +480,63 @@ async function offlineAndBack(browser) {
   for (let i = 0; i < 4; i++) await hearsayStep(host, phones)
 
   const dropped = phones[2]
+  const droppedId = (await snapshot(host, code)).players[2].id
   note(`${dropped.name} goes offline`)
   await dropped.ctx.setOffline(true)
+  const killed = await dropSocket(dropped.page)
+  if (killed === 0) fail('could not find a live bus socket to drop, so this scenario proves nothing')
+  await sleep(1000)
 
-  // The room carries on without them for long enough to time the host out.
-  for (let i = 0; i < 5; i++) await hearsayStep(host, phones, { skip: [dropped.name] })
+  // Move the room on while they are away, and land on a phase where they are a
+  // voter. Their phone is now showing a screen from several phases ago.
+  let staged = false
+  for (let i = 0; i < 14 && !staged; i++) {
+    await hearsayStep(host, phones, { skip: [dropped.name] })
+    const state = await hostState(host, code)
+    staged = state?.phase === 'testimony' && state.rounds[state.roundIndex].accusedId !== droppedId
+  }
+  if (!staged) {
+    fail('never got the room into a voting phase while the phone was offline')
+    return cleanup([hostCtx, ...phones.map((p) => p.ctx)])
+  }
+  const stale = await dropped.page.locator('main button:not([disabled])').count().catch(() => 0)
+  const staleText = await dropped.page.evaluate(() => document.body.innerText).catch(() => '')
+  note(`while offline the phone shows ${stale} buttons: "${staleText.split('\n').filter(Boolean).slice(0, 2).join(' | ')}"`)
+  if (stale >= phones.length) {
+    fail('the phone was still receiving updates while offline, so this scenario proved nothing')
+  }
   await shot(dropped.page, 'offline')
 
-  note(`${dropped.name} comes back`)
+  note(`${dropped.name} comes back, and nobody touches the host`)
   await dropped.ctx.setOffline(false)
-  await sleep(12000)
+
+  // Not one interaction from here on. The phone has to catch itself up.
+  let recovered = false
+  const expected = phones.length
+  for (let i = 0; i < 24 && !recovered; i++) {
+    await sleep(1000)
+    const state = await hostState(host, code)
+    if (state?.phase !== 'testimony') break
+    const buttons = await dropped.page.locator('main button:not([disabled])').count().catch(() => 0)
+    if (buttons >= expected) {
+      recovered = true
+      note(`the phone caught up on its own after ${i + 1}s`)
+    }
+  }
   await shot(dropped.page, 'back')
 
+  if (!recovered) {
+    const seen = await dropped.page.evaluate(() => document.body.innerText).catch(() => '')
+    fail(
+      `${dropped.name} came back online and stayed on a stale screen with nothing to tap (${stale} buttons before, still stuck), reading "${seen.split('\n').filter(Boolean).slice(0, 2).join(' | ')}"`
+    )
+  }
+
   const text = await dropped.page.evaluate(() => document.body.innerText).catch(() => '')
-  if (/Lost the host/i.test(text)) fail(`${dropped.name} never recovered from going offline, still shows "Lost the host"`)
+  if (/lost the host/i.test(text)) fail(`${dropped.name} never recovered from going offline, still shows "Lost the host"`)
   if (await dropped.page.locator('main input').count()) {
     fail(`${dropped.name} was pushed back to the name screen by a network blip`)
   }
-
-  // It must be showing the CURRENT round, not the screen it froze on.
-  const hostRound = (await hostState(host, code))?.roundIndex
-  await hearsayStep(host, phones)
-  await sleep(2500)
-  const phoneText = await dropped.page.evaluate(() => document.body.innerText).catch(() => '')
-  if (!phoneText.trim()) fail(`${dropped.name} shows a blank screen after reconnecting`)
-  note(`host is on round ${hostRound}, recovered phone reads "${phoneText.split('\n').filter(Boolean)[0]}"`)
 
   const roster = await hostRoster(host, code)
   if (new Set(roster).size !== roster.length) fail(`roster gained a duplicate after a reconnect: ${roster.join(', ')}`)
