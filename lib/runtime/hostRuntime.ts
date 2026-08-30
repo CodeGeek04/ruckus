@@ -3,6 +3,7 @@
 
 import { createBus, type Bus } from '@/lib/bus/client'
 import { privateChannel, publicChannel } from '@/lib/bus/channels'
+import { cleanName } from '@/lib/text'
 import { PLAYER_COLORS, type GameModule, type Player, type PlayerId } from '@/lib/types'
 import { HEARTBEAT_MS, type ToHost, type ToPlayer, type ToRoom } from './protocol'
 
@@ -153,9 +154,15 @@ export function createHostRuntime(code: string, cb: HostCallbacks): HostRuntime 
         return
       }
 
+      // A name that cleans down to nothing is not a name. The phone's own
+      // join button refuses those, so this only ever fires for a hand rolled
+      // client, and answering it would put a blank chip on the screen.
+      const name = cleanName(message.name)
+      if (!name) return
+
       const player: Player = {
         id: message.playerId,
-        name: message.name.slice(0, 12),
+        name,
         color: PLAYER_COLORS[players.length % PLAYER_COLORS.length],
         connected: true,
       }

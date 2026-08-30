@@ -4,6 +4,7 @@ import { Countdown } from '@/components/Countdown'
 import { GAMES } from '@/lib/games/registry'
 import { createPlayerClient, type PlayerClient } from '@/lib/runtime/playerClient'
 import { viewPhase } from '@/lib/runtime/protocol'
+import { cleanName, truncateName } from '@/lib/text'
 import type { Player } from '@/lib/types'
 import { use, useEffect, useRef, useState } from 'react'
 
@@ -68,13 +69,13 @@ export default function PlayPage({ params }: { params: Promise<{ code: string }>
         <p className="text-center font-mono text-4xl font-black tracking-widest text-white/50">{code}</p>
         <input
           value={name}
-          onChange={(e) => setName(e.target.value.slice(0, 12))}
+          onChange={(e) => setName(truncateName(e.target.value))}
           placeholder="Your name"
           className="rounded-2xl border-4 border-white/30 bg-white/5 px-5 py-6 text-center text-3xl font-black"
         />
         <button
-          disabled={name.trim().length === 0 || status !== 'open'}
-          onClick={() => client.current?.join(name.trim())}
+          disabled={cleanName(name).length === 0 || status !== 'open'}
+          onClick={() => client.current?.join(cleanName(name))}
           className="rounded-2xl bg-white py-6 text-3xl font-black uppercase text-black disabled:opacity-30"
         >
           {status === 'open' ? 'Join' : 'Connecting...'}

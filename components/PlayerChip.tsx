@@ -1,3 +1,4 @@
+import { initials } from '@/lib/text'
 import type { Player } from '@/lib/types'
 
 export function PlayerChip({ player, size = 'md' }: { player: Player; size?: 'sm' | 'md' | 'lg' }) {
@@ -9,7 +10,7 @@ export function PlayerChip({ player, size = 'md' }: { player: Player; size?: 'sm
         className={`${dimensions} grid place-items-center rounded-full font-black text-black ${player.connected ? '' : 'opacity-30'}`}
         style={{ backgroundColor: player.color }}
       >
-        {player.name.slice(0, 2).toUpperCase()}
+        {initials(player.name)}
       </div>
       <span className="text-xs font-bold uppercase tracking-wide text-white/80">{player.name}</span>
     </div>

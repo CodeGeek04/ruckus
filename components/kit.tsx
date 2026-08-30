@@ -1,6 +1,7 @@
 'use client'
 
 import type { CSSProperties, ReactNode } from 'react'
+import { initials } from '@/lib/text'
 
 /**
  * The shared vocabulary. Both surfaces use these, so the host screen and the
@@ -187,7 +188,7 @@ export function Face({
           className={`slab-sm grid place-items-center font-extrabold uppercase ${box}`}
           style={{ backgroundColor: color, borderRadius: 999 }}
         >
-          {name.slice(0, 2)}
+          {initials(name)}
         </div>
       </div>
       <span className="max-w-20 truncate text-xs font-extrabold uppercase tracking-wide">{name}</span>

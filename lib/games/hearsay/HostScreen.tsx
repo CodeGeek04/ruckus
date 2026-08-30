@@ -5,6 +5,7 @@ import { flavorFor } from '@/lib/flavor'
 import type { Player } from '@/lib/types'
 import type { Phase } from './state'
 import type { HearsayHostView } from './views'
+import { initials } from '@/lib/text'
 
 /**
  * The host screen is a stage, not a dashboard.
@@ -36,12 +37,15 @@ const PHASE_LABEL: Record<Phase, string> = {
   guess: 'deliberation',
   verdict: 'verdict',
   scoreboard: 'standings',
-  ended: 'closed',
+  ended: 'final',
 }
 
 /** Type that has to survive a compressed stream at four metres. */
 const HEADLINE = 'text-[clamp(2.2rem,6.5vw,5.5rem)] leading-[0.92] font-extrabold uppercase tracking-tighter'
 const SUB = 'text-[clamp(1rem,2vw,1.75rem)] font-extrabold uppercase tracking-tight'
+
+/** One vote, as a brick. Chunky enough to read as an object from four metres. */
+const BRICK = 'w-[clamp(2.75rem,5.5vw,5rem)] h-[clamp(1rem,3vh,2rem)] rounded-[7px]'
 
 function totalVotes(view: HearsayHostView): number {
   return Object.values(view.voteCounts).reduce((sum, n) => sum + n, 0)
@@ -56,52 +60,69 @@ function totalVotes(view: HearsayHostView): number {
  * answer.
  */
 function Tally({ view }: { view: HearsayHostView }) {
-  const block = 'w-[clamp(2.5rem,5vw,4.75rem)] h-[clamp(0.8rem,2.1vh,1.5rem)]'
+  const revealed = view.voters !== null
 
   return (
-    <div className="flex flex-wrap items-end justify-center gap-x-[clamp(0.6rem,2.2vw,2.25rem)] gap-y-2">
-      {view.players.map((player) => {
-        const count = view.voteCounts[player.id] ?? 0
-        const voterIds = view.voters
-          ? Object.entries(view.voters)
-              .filter(([, target]) => target === player.id)
-              .map(([voter]) => voter)
-          : []
-        const leads = count > 0 && view.topVoted.includes(player.id)
+    // The tally stands on a chalk plinth. Player colours are the same eight
+    // hues the phases are drenched in, so on the bare field a yellow player
+    // vanishes into a yellow phase. On cream every identity survives.
+    <Slab
+      tone="chalk"
+      tilt={-0.6}
+      className="px-[clamp(0.9rem,2.5vw,2.25rem)] py-[clamp(0.5rem,1.5vh,1.1rem)]"
+    >
+      <div className="flex flex-wrap items-end justify-center gap-x-[clamp(0.6rem,2vw,2rem)] gap-y-2">
+        {view.players.map((player) => {
+          const count = view.voteCounts[player.id] ?? 0
+          const voterIds = view.voters
+            ? Object.entries(view.voters)
+                .filter(([, target]) => target === player.id)
+                .map(([voter]) => voter)
+            : []
+          const leads = revealed && count > 0 && view.topVoted.includes(player.id)
 
-        return (
-          <div key={player.id} className="flex flex-col items-center gap-1.5">
-            <span className="tnum text-[clamp(1.1rem,2.2vw,2rem)] leading-none font-extrabold">
-              {count}
-            </span>
+          return (
+            <div key={player.id} className="flex flex-col items-center gap-1.5">
+              <span
+                className={`tnum text-[clamp(1.2rem,2.6vw,2.2rem)] leading-none font-extrabold ${
+                  leads ? 'slab-sm px-3 py-0.5' : 'px-3 py-0.5'
+                }`}
+                style={leads ? { backgroundColor: 'var(--color-yellow)' } : undefined}
+              >
+                {count}
+              </span>
 
-            <div className="flex flex-col-reverse gap-[3px]">
-              {count === 0 && (
-                <div
-                  className={`${block} rounded-[10px] border-[3px] border-dashed opacity-30`}
-                  style={{ borderColor: 'var(--color-ink)' }}
-                />
-              )}
-              {Array.from({ length: count }, (_, i) => {
-                const voter = view.players.find((p) => p.id === voterIds[i])
-                return (
+              {/* Stacked bricks, not bars. Flat inside the plinth: a shadow on
+                  every brick would turn one object into a pile of cards. */}
+              <div className="flex flex-col-reverse gap-[3px]">
+                {count === 0 && (
                   <div
-                    key={i}
-                    className={`pop slab-sm ${block}`}
-                    style={{
-                      backgroundColor: voter ? voter.color : player.color,
-                      animationDelay: `${i * 60}ms`,
-                    }}
+                    className={`${BRICK} border-[3px] border-dashed opacity-25`}
+                    style={{ borderColor: 'var(--color-ink)' }}
                   />
-                )
-              })}
-            </div>
+                )}
+                {Array.from({ length: count }, (_, i) => {
+                  const voter = view.players.find((p) => p.id === voterIds[i])
+                  return (
+                    <div
+                      key={i}
+                      className={`pop ${BRICK} border-[3px]`}
+                      style={{
+                        backgroundColor: voter ? voter.color : player.color,
+                        borderColor: 'var(--color-ink)',
+                        animationDelay: `${i * 60}ms`,
+                      }}
+                    />
+                  )
+                })}
+              </div>
 
-            <Face name={player.name} color={player.color} size="sm" dim={!leads && count === 0} />
-          </div>
-        )
-      })}
-    </div>
+              <Face name={player.name} color={player.color} size="sm" />
+            </div>
+          )
+        })}
+      </div>
+    </Slab>
   )
 }
 
@@ -118,14 +139,18 @@ function Standings({ view, awarded }: { view: HearsayHostView; awarded: boolean 
           className="rise flex items-center gap-[clamp(0.6rem,1.6vw,1.5rem)] px-4 py-[clamp(0.25rem,0.9vh,0.6rem)]"
           style={{ animationDelay: `${index * 60}ms` }}
         >
-          <span className="tnum w-9 text-[clamp(0.9rem,1.8vw,1.6rem)] font-extrabold opacity-35">
-            {index + 1}
+          <span
+            className={`w-9 text-[clamp(0.9rem,1.8vw,1.6rem)] font-extrabold ${
+              index === 0 && !awarded ? '' : 'tnum opacity-35'
+            }`}
+          >
+            {index === 0 && !awarded ? '👑' : index + 1}
           </span>
           <span
             className="slab-sm grid h-[clamp(1.7rem,3.2vh,2.4rem)] w-[clamp(1.7rem,3.2vh,2.4rem)] shrink-0 place-items-center text-[clamp(0.6rem,1.1vw,0.95rem)] font-extrabold uppercase"
             style={{ backgroundColor: player.color, borderRadius: 999 }}
           >
-            {player.name.slice(0, 2)}
+            {initials(player.name)}
           </span>
           <span className="flex-1 truncate text-[clamp(1rem,2.2vw,2rem)] font-extrabold uppercase tracking-tight">
             {player.name}
@@ -191,8 +216,11 @@ export function HearsayHostScreen({ view }: { view: HearsayHostView }) {
               <Sticker tone="chalk" tilt={-3}>
                 the room is being asked
               </Sticker>
-              <p className={`${HEADLINE} stamp max-w-6xl`}>
-                something about {view.accusedName}
+              <p className="text-[clamp(1.2rem,3vw,2.75rem)] leading-none font-extrabold uppercase tracking-tight opacity-70">
+                something about
+              </p>
+              <p className="stamp max-w-full text-[clamp(2.75rem,10vw,8.5rem)] leading-[0.9] font-extrabold uppercase tracking-tighter break-words">
+                {view.accusedName}
               </p>
               {accused && (
                 <div className="wobble">
@@ -251,7 +279,7 @@ export function HearsayHostScreen({ view }: { view: HearsayHostView }) {
               <Sticker tone="chalk" tilt={-2}>
                 the charge was
               </Sticker>
-              <Slab tone="chalk" className="max-w-5xl px-6 py-3" tilt={-0.8}>
+              <Slab tone="chalk" className="max-w-4xl px-6 py-3" tilt={-0.8}>
                 <p className="text-[clamp(1.1rem,2.9vw,2.6rem)] leading-tight font-extrabold">
                   {view.question}
                 </p>
@@ -269,7 +297,7 @@ export function HearsayHostScreen({ view }: { view: HearsayHostView }) {
           {view.phase === 'scoreboard' && (
             <>
               <Sticker tone="chalk" tilt={-2}>
-                standings
+                after round {view.roundNumber}
               </Sticker>
               <Standings view={view} awarded />
             </>
