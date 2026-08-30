@@ -69,7 +69,7 @@ export const DEFAULT_CONFIG: HearsayConfig = {
     scoreboard: 8000,
   },
   minRounds: 8,
-  tone: 'mild',
+  tone: 'spicy',
 }
 
 export type HearsayState = {

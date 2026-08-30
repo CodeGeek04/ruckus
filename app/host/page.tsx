@@ -112,7 +112,7 @@ export default function HostPage() {
   const [game, setGame] = useState<GameModule<any, any, any, any> | null>(null)
   const [view, setView] = useState<unknown>(null)
   const [deadline, setDeadline] = useState<number | null>(null)
-  const [tone, setTone] = useState<'mild' | 'spicy'>('mild')
+  const [tone, setTone] = useState<'mild' | 'spicy'>('spicy')
   const runtime = useRef<HostRuntime | null>(null)
 
   useEffect(() => {

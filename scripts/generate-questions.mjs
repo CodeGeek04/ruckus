@@ -1,7 +1,9 @@
 // Grow the Hearsay question bank.
 //
 //   node scripts/generate-questions.mjs conflict 10
-//   node scripts/generate-questions.mjs all 8
+//   node scripts/generate-questions.mjs all 8 gurgaon spicy
+//
+// Third argument is a theme key from THEMES, fourth is mild or spicy.
 //
 // Uses the Anthropic API directly (ANTHROPIC_KEY in .env.local). Bedrock is not
 // used here: the AWS account gates Anthropic models behind a use case form.
@@ -36,6 +38,23 @@ if (!API_KEY) {
 
 const requested = process.argv[2] ?? 'conflict'
 const count = Number(process.argv[3] ?? 10)
+const theme = process.argv[4] ?? 'none'
+const tone = process.argv[5] === 'spicy' ? 'spicy' : 'mild'
+
+// The group is a set of close friends in Delhi and Gurgaon. Generic party game
+// questions are forgettable; the specific ones are what make people shout.
+const THEMES = {
+  none: '',
+  gurgaon: `Set these in Gurgaon corporate life. Draw on: Cyber Hub and Sector 29 nights out, DLF sector addresses nobody can find, the Rapid Metro, office parks, cab reimbursement claims, standup calls with cameras off, the annual Gurgaon flooding, laptop bags at brunch, LinkedIn posts, appraisal season.`,
+  delhi: `Set these in Delhi city life. Draw on: Connaught Place, Hauz Khas, Sarojini bargaining, Karol Bagh, Majnu ka Tila, the Blue Line metro, DTC buses, Old Delhi food runs, winter smog and air purifiers, the summer heat, farmhouse parties, aunties, wedding season.`,
+  bangalore: `The whole group despises Bangalore and this is a running joke. Draw on: Silk Board junction, Koramangala, HSR Layout, three hour commutes, the smugness about the weather, startup founders, PG accommodation, potholes, everyone who moved there and will not shut up about it.`,
+  chaos: `Set these in everyday Indian app and food chaos. Draw on: Blinkit orders at 2am, Zomato and Swiggy, Ola and Uber drivers cancelling, splitting bills and who never pays, chai and cigarette breaks, momos, the group trip that never happens, someone always being late, the WhatsApp group nobody replies in.`,
+}
+
+if (!(theme in THEMES)) {
+  console.error(`Unknown theme "${theme}". Pick one of: ${Object.keys(THEMES).join(', ')}.`)
+  process.exit(1)
+}
 const families = requested === 'all' ? FAMILIES : [requested]
 
 if (requested !== 'all' && !FAMILIES.includes(requested)) {
@@ -58,14 +77,23 @@ Each question asks the group to point at ONE person in the room. The question is
 
 Family for this batch: "${family}" (${FAMILY_BRIEFS[family]}).
 
+${THEMES[theme]}
+
 Write ${count} questions.
 
 Rules:
-- Every question MUST contain {X} exactly once, and must be answerable by naming another person.
+- Every question MUST contain {X} exactly once.
+- CRITICAL: the ONLY valid answer is the name of another person in the room. Never ask "how long", "how much", "how many", "what" or anything answerable with a duration, an amount, a yes or no, or a thing. If the question cannot be answered by pointing at a friend, it is wrong.
 - Simple, everyday vocabulary. Short. Under 12 words where possible.
 - No em dashes anywhere.
-- Funny and warm, never cruel. Nothing about appearance, weight, money problems, family trouble, mental health, or anything that would genuinely hurt to hear read aloud.
-- The joke should be about a situation, not an insult.
+${
+    tone === 'spicy'
+      ? `- These are close friends who enjoy being roasted. Be pointed and personal: who is the problem, who is secretly judging, who talks about whom, crushes, petty grudges, being called out.
+- Still never cruel about appearance, weight, money problems, family trouble or mental health. Aim at behaviour and reputation, which people enjoy defending.`
+      : `- Funny and warm, never cruel. Nothing about appearance, weight, money problems, family trouble, mental health, or anything that would genuinely hurt to hear read aloud.
+- The joke should be about a situation, not an insult.`
+  }
+- The joke should be about a situation or a reputation, not an insult about who someone is.
 - Vary the shape. Do not start every question with "Who is".
 - These must feel different from each other, not ten rewordings of one idea.
 
@@ -120,8 +148,8 @@ for (const family of families) {
 
   console.log(`\n  // ${family}`)
   questions.forEach((template, i) => {
-    const id = `${ID_PREFIX[family]}${200 + i}`
-    console.log(`  { id: '${id}', family: '${family}', tone: 'mild', template: ${JSON.stringify(template)} },`)
+    const id = `${ID_PREFIX[family]}-${theme}-${tone[0]}${i}`
+    console.log(`  { id: '${id}', family: '${family}', tone: '${tone}', template: ${JSON.stringify(template)} },`)
   })
 }
 

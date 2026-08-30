@@ -10,7 +10,7 @@ import { hearsayHostView, hearsayPlayerView, type HearsayHostView, type HearsayP
  * than a parameter, because the GameModule contract deliberately keeps init
  * to one argument so every game stays interchangeable.
  */
-let selectedTone: 'mild' | 'spicy' = 'mild'
+let selectedTone: 'mild' | 'spicy' = 'spicy'
 
 export function setHearsayTone(tone: 'mild' | 'spicy') {
   selectedTone = tone
