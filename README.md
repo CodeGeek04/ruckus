@@ -2,9 +2,9 @@
 
 A pack of party games played the Jackbox way: one shared screen, everyone else on their phone.
 
-- **Hearsay** — the room secretly answers a question about you. You never hear the question, only the votes, and you have to work out what you were accused of.
-- **Who Said It** — real messages from the group's own WhatsApp export. Guess who typed it.
-- **Broken Telephone** — a sentence becomes an AI image becomes a sentence, several people deep, then the whole chain is revealed.
+- **Hearsay**: the room secretly answers a question about you. You never hear the question, only the votes, and you have to work out what you were accused of.
+- **Who Said It**: real messages from the group's own WhatsApp export. Guess who typed it.
+- **Broken Telephone**: a sentence becomes an AI image becomes a sentence, several people deep, then the whole chain is revealed.
 
 ## Running it
 
@@ -21,8 +21,8 @@ The host browser tab **is** the game server. It holds all state, runs a pure red
 
 AWS AppSync Events is used purely as a message bus, with two channel shapes per room:
 
-- `/room/{code}` — public state, and player inputs.
-- `/room/{code}/p/{playerId}` — per player secrets. Anything a player must not see lives only here.
+- `/room/{code}`: public state, and player inputs.
+- `/room/{code}/p/{playerId}`: per player secrets. Anything a player must not see lives only here.
 
 `hostView` output is broadcast to every device; `playerView` output goes to one phone. That split is the security boundary, and it is what stops the accused reading their own question off the shared screen. Tests pin it.
 

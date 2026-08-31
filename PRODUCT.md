@@ -12,9 +12,9 @@ A pack of party games played the Jackbox way: one shared screen, everyone else o
 
 Three games ship:
 
-- **Hearsay** — the room secretly answers a question about you. You never hear the question. You have to work out what you were accused of from the votes alone.
-- **Who Said It** — real messages from the group's own WhatsApp history. Guess who typed it.
-- **Broken Telephone** — a sentence becomes an AI image becomes a sentence, six people deep, then the whole chain is revealed.
+- **Hearsay**: the room secretly answers a question about you. You never hear the question. You have to work out what you were accused of from the votes alone.
+- **Who Said It**: real messages from the group's own WhatsApp history. Guess who typed it.
+- **Broken Telephone**: a sentence becomes an AI image becomes a sentence, six people deep, then the whole chain is revealed.
 
 ## Users
 
