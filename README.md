@@ -71,6 +71,11 @@ node scripts/generate-questions.mjs conflict 10 gurgaon spicy
 
 Read every generated line before pasting it in. Questions that mean the same thing make an unsolvable decoy pair, so near duplicates are worse than useless.
 
+## Documentation
+
+- `ARCHITECTURE.md` — the stack, the host-as-server model, the transport, the module contract, testing.
+- `PRODUCT.md` and `DESIGN.md` — who this is for and how it should look.
+
 ## Design
 
 `PRODUCT.md` and `DESIGN.md` are the source of truth for who this is for and how it should look. Read them before changing any UI.
